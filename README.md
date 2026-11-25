@@ -10,7 +10,7 @@ Post, follow friends and build a following, with no company in the middle.<br>
 Your profile lives on your own computer, signed with a key only you hold, and is shared peer to peer over IPFS.
 
 [![CI](https://github.com/HerbAvenue/SocialKey/actions/workflows/ci.yml/badge.svg)](https://github.com/HerbAvenue/SocialKey/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.5.0-7c3aed)](https://github.com/HerbAvenue/SocialKey/releases)
+[![Version](https://img.shields.io/badge/version-0.5.1-7c3aed)](https://github.com/HerbAvenue/SocialKey/releases)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-555)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
