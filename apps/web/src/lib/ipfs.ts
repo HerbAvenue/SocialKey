@@ -1,7 +1,6 @@
-import type { VerifiedFetch } from '@helia/verified-fetch'
 import {
+  blockMatches,
   CID,
-  cidOf,
   didToIpnsName,
   type Manifest,
   type Message,
@@ -13,36 +12,27 @@ import {
   readMessagePage,
   readPost,
   readPostPage,
+  verifyIpnsRecord,
 } from '@socialkey/core'
-import { GATEWAYS, ROUTERS } from './config'
+import { GATEWAYS, MEDIA_GATEWAY, ROUTERS } from './config'
 
 const RAW = 'application/vnd.ipld.raw'
+const IPNS_RECORD = 'application/vnd.ipfs.ipns-record'
 // Without these, a fetch nobody can serve (e.g. an offline profile) would load forever.
 const FETCH_TIMEOUT_MS = 30_000
 // Resolving someone else's IPNS name goes through the DHT and can take a while.
 const IPNS_TIMEOUT_MS = 60_000
 
-let verifiedFetch: Promise<VerifiedFetch> | null = null
 let localGateway: string | null = null
 
 /**
- * The paired agent's Kubo gateway. When set, everything is fetched from it
- * directly: browsers can't dial the TCP/QUIC addresses that routers return for
- * home nodes, so verified-fetch can't reach that content on its own.
+ * The paired agent's Kubo gateway. When set, everything is fetched from it;
+ * otherwise from public trustless gateways. Either way every block is checked
+ * against its CID and every manifest against its author's signature, so no
+ * gateway has to be trusted.
  */
 export function setLocalGateway(gateway: string | null): void {
   localGateway = gateway
-}
-
-/**
- * Used only when no agent is paired: public trustless gateways and delegated routing.
- * Loaded on demand, since Helia is most of the bundle and paired users never need it.
- */
-function getVerifiedFetch(): Promise<VerifiedFetch> {
-  verifiedFetch ??= import('@helia/verified-fetch').then(({ createVerifiedFetch }) =>
-    createVerifiedFetch({ gateways: GATEWAYS, routers: ROUTERS }),
-  )
-  return verifiedFetch
 }
 
 function withTimeout(ms: number, signal?: AbortSignal): AbortSignal {
@@ -54,30 +44,47 @@ function describeFailure(path: string, err: unknown): Error {
   if (err instanceof DOMException && err.name === 'TimeoutError') {
     return new Error(`Timed out fetching ${path}: no reachable node has it right now.`)
   }
+  if (err instanceof AggregateError) return new Error(`Couldn't fetch ${path} from any gateway.`)
   return err instanceof Error ? err : new Error(String(err))
+}
+
+async function get(url: string, accept: string, signal: AbortSignal): Promise<Uint8Array> {
+  const res = await fetch(url, { headers: { accept }, signal })
+  if (!res.ok) throw new Error(`${url} answered ${res.status}`)
+  return new Uint8Array(await res.arrayBuffer())
+}
+
+/** A raw block, from the local gateway or the first public gateway that has it, checked against its CID. */
+async function fetchVerifiedBlock(cid: CID, signal: AbortSignal): Promise<Uint8Array> {
+  const sources = localGateway ? [localGateway] : GATEWAYS
+  return Promise.any(
+    sources.map(async (gateway) => {
+      const bytes = await get(`${gateway}/ipfs/${cid}?format=raw`, RAW, signal)
+      if (!(await blockMatches(cid, bytes))) throw new Error(`${gateway} returned the wrong data for ${cid}`)
+      return bytes
+    }),
+  )
+}
+
+/** Where an IPNS name points, from a signed record checked against the name's own key. */
+async function resolveIpns(name: string, signal: AbortSignal): Promise<CID> {
+  const urls = localGateway
+    ? [`${localGateway}/routing/v1/ipns/${name}`, `${localGateway}/ipns/${name}?format=ipns-record`]
+    : [
+        ...ROUTERS.map((r) => `${r}/routing/v1/ipns/${name}`),
+        ...GATEWAYS.map((g) => `${g}/ipns/${name}?format=ipns-record`),
+      ]
+  return Promise.any(urls.map(async (url) => verifyIpnsRecord(name, await get(url, IPNS_RECORD, signal)).cid))
 }
 
 /** Fetches one raw block by `/ipfs/<cid>` or `/ipns/<name>` path. */
 async function fetchBlock(path: string, signal?: AbortSignal): Promise<Uint8Array> {
   const [, namespace = '', id = ''] = path.split('/')
   const ms = namespace === 'ipns' ? IPNS_TIMEOUT_MS : FETCH_TIMEOUT_MS
+  const combined = withTimeout(ms, signal)
   try {
-    if (!localGateway) {
-      const vf = await getVerifiedFetch()
-      const res = await vf(`${namespace}://${id}`, { headers: { accept: RAW }, signal: withTimeout(ms, signal) })
-      if (!res.ok) throw new Error(`Fetching ${path} failed (${res.status})`)
-      return new Uint8Array(await res.arrayBuffer())
-    }
-    const res = await fetch(`${localGateway}${path}`, { headers: { accept: RAW }, signal: withTimeout(ms, signal) })
-    if (!res.ok) throw new Error(`Fetching ${path} failed (${res.status})`)
-    const bytes = new Uint8Array(await res.arrayBuffer())
-    // Our objects are single dag-json blocks, so checking the CID is just hashing the bytes.
-    // An /ipns/ response can't be checked against the name here, but manifests are
-    // signature-checked against their author's did:key by the caller.
-    if (namespace === 'ipfs' && !(await cidOf(bytes)).equals(CID.parse(id))) {
-      throw new Error(`Gateway returned the wrong data for ${id}`)
-    }
-    return bytes
+    const cid = namespace === 'ipns' ? await resolveIpns(id, combined) : CID.parse(id)
+    return await fetchVerifiedBlock(cid, combined)
   } catch (err) {
     throw describeFailure(path, err)
   }
@@ -110,16 +117,12 @@ export async function loadMessage(cid: CID | string, signal?: AbortSignal): Prom
   return readMessage(await fetchBlock(`/ipfs/${cid}`, signal))
 }
 
-/** A URL for a media file (UnixFS). */
-export async function loadMediaUrl(cid: CID | string, signal?: AbortSignal): Promise<string> {
-  // The local node serves (and verifies) files itself.
+/**
+ * A URL for a media file (UnixFS). Images are served by a gateway rather than
+ * hash-checked here: an <img> can't run code, and files can span many blocks.
+ */
+export async function loadMediaUrl(cid: CID | string): Promise<string> {
   if (localGateway) return `${localGateway}/ipfs/${cid}`
-  const vf = await getVerifiedFetch()
-  try {
-    const res = await vf(`ipfs://${cid}`, { signal: withTimeout(FETCH_TIMEOUT_MS, signal) })
-    if (!res.ok) throw new Error(`Fetching media ${cid} failed (${res.status})`)
-    return URL.createObjectURL(await res.blob())
-  } catch (err) {
-    throw describeFailure(`/ipfs/${cid}`, err)
-  }
+  const v1 = CID.parse(cid.toString()).toV1()
+  return `${MEDIA_GATEWAY.protocol}//${v1}.ipfs.${MEDIA_GATEWAY.host}/`
 }

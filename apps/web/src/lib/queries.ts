@@ -69,7 +69,7 @@ export function usePost(cid: string | undefined) {
 export function useMediaUrl(cid: string) {
   const query = useQuery({
     queryKey: ['media', cid],
-    queryFn: ({ signal }) => loadMediaUrl(cid, signal),
+    queryFn: () => loadMediaUrl(cid),
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
   })

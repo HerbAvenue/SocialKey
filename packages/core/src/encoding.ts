@@ -19,6 +19,14 @@ export async function cidOf(bytes: Uint8Array): Promise<CID> {
   return CID.createV1(dagJson.code, await sha256.digest(bytes))
 }
 
+/** True when `bytes` hash to `cid` (sha2-256, any codec). */
+export async function blockMatches(cid: CID, bytes: Uint8Array): Promise<boolean> {
+  if (cid.multihash.code !== sha256.code) return false
+  const digest = (await sha256.digest(bytes)).digest
+  const expected = cid.multihash.digest
+  return digest.length === expected.length && digest.every((b, i) => b === expected[i])
+}
+
 function dropUndefined(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(dropUndefined)
   if (value === null || typeof value !== 'object') return value

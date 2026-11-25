@@ -21,7 +21,7 @@ A public web frontend lets anyone browse profiles and view timelines of followed
 | Language | TypeScript (strict), ESM everywhere | One language across frontend, agent, and shared schemas |
 | Monorepo | pnpm workspaces | Shared `core` package used by both apps |
 | Frontend | Vite + React + Tailwind v4, React Router (`HashRouter`), TanStack Query | Static build with relative paths and hash routes, so the site can be hosted on IPFS |
-| Browser retrieval | `@helia/verified-fetch` | Verifies content from trustless gateways |
+| Browser retrieval | Plain `fetch` of raw blocks and IPNS records from trustless gateways, verified in `core` | Every block is hash-checked and every IPNS record signature-checked, so no gateway is trusted, with no Helia in the bundle |
 | Local agent | Node.js + Fastify, run with `tsx` (no build step) | Small HTTP API the frontend calls to publish |
 | Desktop app | Electron + esbuild + electron-builder, bundled Kubo (fetched per target by `apps/desktop/scripts/fetch-kubo.cjs`) | Runs the agent in-process; tray icon; no separate installs for users |
 | IPFS node | Kubo, via a small `fetch`-based RPC client (`apps/agent/src/kubo.ts`) | Only five endpoints are needed; avoids a heavy client dependency |
@@ -110,14 +110,13 @@ Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) 
 - Pairing: the agent prints a one-time code (rotated after each use); `POST /pair` exchanges it for a token. Only SHA-256 token hashes are stored (`tokens.json`). The agent always binds to `127.0.0.1`; CORS allows only `SOCIALKEY_ORIGINS`.
 
 ### Web (`apps/web`)
-- `src/lib/ipfs.ts` fetches raw blocks (`Accept: application/vnd.ipld.raw`) and passes them to `core`'s readers. When paired, everything comes straight from the agent's Kubo gateway, and `/ipfs/` blocks are checked by re-hashing them. Don't route this through verified-fetch: in a browser it asks routers for providers, gets home-node TCP/QUIC addresses it can't dial, and hangs. verified-fetch (public gateways + delegated routing) is used only when no agent is paired.
+- `src/lib/ipfs.ts` fetches raw blocks (`?format=raw`) and IPNS records directly over HTTP: from the paired agent's Kubo gateway, or else from public trustless gateways and delegated routers (`VITE_GATEWAYS`, `VITE_ROUTERS`). Blocks are checked with `blockMatches`; IPNS records with `verifyIpnsRecord` (`core/src/ipns.ts`: Ed25519 names only, V2 signature, expiry). Don't reintroduce verified-fetch/Helia: in a browser it asks routers for providers, gets home-node TCP/QUIC addresses it can't dial, and hangs. Images are loaded by URL from the local gateway or a subdomain gateway (`VITE_MEDIA_GATEWAY`), not hash-checked.
 - `setLocalGateway` is called inside the `['me']` query function, before `me` reaches any component, so no fetch starts without it. Every fetch has a timeout (30s, or 60s for IPNS), so pages show an error instead of loading forever.
 - Your own manifest is fetched by the CID from `GET /me`, not via IPNS, so your changes show up immediately.
 - `src/lib/queries.ts`: posts are cached forever by CID, manifests for 60s. `useCircle` loads everyone you follow (20 posts each); `useExtendedNetwork` adds up to 120 friends of friends (5 posts each). Both are keyed by your follow list, not your manifest CID, so likes and posts don't reload the network. A profile or post that fails to resolve or verify is skipped, never fatal.
 - `src/lib/social.ts` holds the pure graph logic: suggestions, notifications, trending tags, reply/like/repost counts and search, all computed from the loaded `Network`. There is no server, so these only cover people within two follows; UI copy says so.
 - `AppContext` provides the merged network, toasts, the compose dialog and first-run onboarding to every page. Pages that need a paired agent are wrapped in `RequireAgent` (redirects to `/connect`).
 - After an agent write, invalidate `['me']`: the new manifest CID refreshes your own manifest and posts.
-- Helia (`@helia/verified-fetch`) is imported dynamically and only loads for visitors without a paired agent.
 - Share links use `VITE_PUBLIC_URL` when set; `VITE_DOWNLOAD_URL` makes the landing page's download button link out.
 
 ### Desktop (`apps/desktop`)

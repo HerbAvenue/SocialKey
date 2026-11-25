@@ -12,7 +12,6 @@
     "publish:ipfs": "node scripts/publish-ipfs.mjs"
   },
   "dependencies": {
-    "@helia/verified-fetch": "^8.1.2",
     "@socialkey/core": "workspace:*",
     "@tanstack/react-query": "^5.104.5",
     "lucide-react": "^1.79.0",
