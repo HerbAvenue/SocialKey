@@ -155,7 +155,7 @@ flowchart LR
     kubo -- "store" --> blocks
     friends["Followers' apps<br/>pin your posts and<br/>re-announce your name"] --> net
     visitor["Visitors<br/>(public gateways)"] -- "verified fetch" --> net
-    kubo <-. "PubSub: live updates" .-> friends
+    kubo <-.->|"PubSub: live updates"| friends
 ```
 
 1. **Your identity is a key.** One Ed25519 key pair is your identity (`did:key:z6Mk…`), your signing key and your IPNS name, all at once. Nobody issues it and nobody can revoke it.
