@@ -4,6 +4,7 @@ import { createContext, type ReactNode, useCallback, useContext, useMemo, useSta
 import { useKnownNetwork } from '../lib/queries'
 import type { Network } from '../lib/social'
 import { ComposeModal } from './ComposeModal'
+import { Onboarding } from './Onboarding'
 
 export interface ComposeTarget {
   replyTo?: CID
@@ -41,6 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <Context.Provider value={value}>
       {children}
       {composing && <ComposeModal target={composing} onClose={() => setComposing(null)} />}
+      <Onboarding />
       <div className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 md:bottom-6">
         {toasts.map((t) => (
           <div

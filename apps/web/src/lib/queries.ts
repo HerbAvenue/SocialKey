@@ -1,5 +1,5 @@
 import { CID, type Manifest, mergeTimeline, type TimelineEntry } from '@socialkey/core'
-import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import { agent, getToken } from './agent'
 import { didForHandle } from './dns'
 import { loadManifest, loadMediaUrl, loadPost, loadPostPage, setLocalGateway } from './ipfs'
@@ -48,7 +48,12 @@ export function postQuery(cid: string) {
 export function useManifest(did: string | undefined) {
   const me = useMe().data
   const cid = did && did === me?.did ? me.manifestCid : undefined
-  return useQuery({ ...manifestQuery(did ?? '', cid), enabled: did !== undefined })
+  return useQuery({
+    ...manifestQuery(did ?? '', cid),
+    enabled: did !== undefined,
+    // After you post or like, your manifest CID changes; keep showing the old one until the new one loads.
+    placeholderData: (previous) => (previous?.author === did ? keepPreviousData(previous) : undefined),
+  })
 }
 
 /** Your own manifest, or undefined when not paired. */
@@ -133,6 +138,8 @@ export function useCircle() {
     queryKey: ['network', 'circle', own?.author, own?.follows.join(',')],
     enabled: own !== undefined,
     staleTime: MANIFEST_TTL,
+    // New posts from people you follow show up without reloading.
+    refetchInterval: 2 * MANIFEST_TTL,
     queryFn: async (): Promise<Network> => {
       if (!own) return { people: new Map(), posts: [] }
       return loadPeople(client, own.follows, 1, POSTS_PER_FOLLOW)
