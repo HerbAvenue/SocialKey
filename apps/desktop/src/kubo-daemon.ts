@@ -48,6 +48,10 @@ export class KuboDaemon {
     await this.ipfs('config', 'Addresses.Gateway', `/ip4/127.0.0.1/tcp/${this.ports.gateway}`)
     // The web app resolves IPNS through the local node's /routing/v1 endpoint.
     await this.ipfs('config', '--json', 'Gateway.ExposeRoutingAPI', 'true')
+    // IPNS over PubSub pushes profile updates to nodes that recently resolved them,
+    // so followers see new posts in seconds instead of waiting for a DHT lookup.
+    await this.ipfs('config', '--json', 'Pubsub.Enabled', 'true')
+    await this.ipfs('config', '--json', 'Ipns.UsePubsub', 'true')
 
     this.log = []
     const proc = spawn(this.bin, ['daemon', '--enable-gc'], {

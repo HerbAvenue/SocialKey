@@ -103,6 +103,8 @@ export class HttpKubo implements Kubo {
       arg: `/ipfs/${cid}`,
       key: keyName,
       lifetime: '48h',
+      // How long resolvers may cache the record: short, so followers see new posts quickly.
+      ttl: '1m',
       'allow-offline': 'true',
     })
   }
