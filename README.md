@@ -12,6 +12,7 @@ Your profile lives on your own computer, signed with a key only you hold, and is
 [![CI](https://github.com/HerbAvenue/SocialKey/actions/workflows/ci.yml/badge.svg)](https://github.com/HerbAvenue/SocialKey/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-0.5.0-7c3aed)](https://github.com/HerbAvenue/SocialKey/releases)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-555)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![IPFS](https://img.shields.io/badge/built%20on-IPFS%20%2B%20IPNS-65c2cb?logo=ipfs&logoColor=white)
 
@@ -290,7 +291,7 @@ SocialKey is **early software**. It works on the live IPFS network today, but be
 <details>
 <summary><b>Is it free? Are there ads?</b></summary>
 <br>
-Yes, it's free, and there are no ads and no tracking. There's no company server to pay for: each person's computer hosts their own profile.
+Yes, it's free and open source, and there are no ads and no tracking. There's no company server to pay for: each person's computer hosts their own profile.
 </details>
 
 <details>
@@ -325,4 +326,4 @@ Yes, while it's on the same Wi-Fi as your computer: turn on <i>Allow devices on 
 
 ## License
 
-A license hasn't been chosen yet, so all rights are reserved for now.
+SocialKey is free software, licensed under the [GNU Affero General Public License v3.0](LICENSE). You may use, study, change and share it. If you distribute a modified version, or run one as a network service, you must make your source code available under the same license.

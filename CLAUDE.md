@@ -139,4 +139,4 @@ Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) 
 - Windows: every Kubo child process needs `windowsHide: true` (or a console window pops up), and `stop()` asks Kubo to shut down over the API because `kill()` on Windows terminates immediately. The tray uses the full-colour `tray-win.png`, since taskbars can be light or dark.
 
 ## Not built yet
-A native mobile app, an in-browser Helia node for posting without an agent, code signing / auto-update for the desktop app. There is no LICENSE yet, so don't describe the project as open source in UI copy.
+A native mobile app, an in-browser Helia node for posting without an agent, code signing / auto-update for the desktop app. The project is licensed AGPL-3.0-only (`LICENSE`).
