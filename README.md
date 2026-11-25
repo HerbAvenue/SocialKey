@@ -118,7 +118,7 @@ You don't need to know what IPFS is. The SocialKey desktop app bundles everythin
    |---|---|
    | Windows 10 / 11 | `SocialKey Setup <version>.exe` |
    | Linux | `SocialKey-<version>.AppImage` (make it executable, then run it) |
-   | macOS | `SocialKey-<version>.dmg` (experimental) |
+   | macOS | `SocialKey-<version>-arm64.dmg` (Apple Silicon) or `SocialKey-<version>.dmg` (Intel), experimental |
 
 2. **Click _Open SocialKey_** in the app window. Your timeline opens in your browser.
 3. **Set up your profile** in Settings: name, bio, avatar and banner.
