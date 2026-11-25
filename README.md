@@ -117,7 +117,7 @@ You don't need to know what IPFS is. The SocialKey desktop app bundles everythin
 
    | System | File |
    |---|---|
-   | Windows 10 / 11 | `SocialKey Setup <version>.exe` |
+   | Windows 10 / 11 | `SocialKey.Setup.<version>.exe` |
    | Linux | `SocialKey-<version>.AppImage` (make it executable, then run it) |
    | macOS | `SocialKey-<version>-arm64.dmg` (Apple Silicon) or `SocialKey-<version>.dmg` (Intel), experimental |
 
