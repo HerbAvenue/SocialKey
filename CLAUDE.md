@@ -63,7 +63,7 @@ pnpm --filter @socialkey/desktop dist:win  # Windows NSIS installer; on Linux/ma
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and the web build. Pushing a `v*` tag runs `release.yml`, which builds each OS's installer on that OS (unsigned; `CSC_IDENTITY_AUTO_DISCOVERY=false`) and drafts a GitHub release. `pnpm --filter @socialkey/web publish:ipfs` adds the built site to Kubo (`IPFS_BIN` overrides the binary).
 
-Screenshots in `docs/screenshots/` were captured from the seeded demo network; regenerate them after visible UI changes.
+Screenshots in `docs/screenshots/` were captured from the seeded demo network; regenerate them after visible UI changes. `desktop.png` is the desktop renderer bundled with esbuild and loaded in headless Chromium (500×888 at 2×), with a stub `window.socialkey` bridge returning a fixed `AppState`.
 
 Dependencies with install scripts must be allowed in `allowBuilds` in `pnpm-workspace.yaml` (`pnpm approve-builds <pkg>`), or installs fail.
 
