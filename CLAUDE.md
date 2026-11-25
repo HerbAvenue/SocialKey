@@ -81,6 +81,12 @@ Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) 
 - New fields must be optional: old clients ignore them, and signatures cover the raw object, so they stay verifiable.
 - **Post page** (unsigned; trusted through the signed manifest's CID link): `posts`, optional `prev`. When a 51st recent post arrives, the oldest 25 move into a new page whose `prev` is the old `olderPosts` (`prependPost` in `core/src/manifest.ts`).
 
+### Direct messages (`core/src/dm.ts`)
+- Two people's Ed25519 keys are converted to X25519; HKDF over the shared secret (salted with both dids, sorted) gives a conversation key and a 16-byte hex `tag`, identical on both sides.
+- A `message` object is `{ tag, nonce, ciphertext }`, XChaCha20-Poly1305 with the sender's did as associated data (so a message can't be passed off as the other person's). Plaintext is JSON `{ text, createdAt }`.
+- Messages live in the **sender's** profile: `manifest.messages` → newest `message-page` (≤50 CIDs, `prev` link), built with `appendMessage`.
+- Only the agent holds secret keys. It sends (`POST /messages`) and hands paired frontends conversation keys (`POST /messages/keys`); the web app decrypts in the browser by scanning message pages of people in the network plus remembered contacts (`apps/web/src/lib/messages.ts`), matching on `tag`.
+
 ### Domain handles (`core/src/handle.ts`)
 `alice.com` is a valid handle for a did when the TXT record `_socialkey.alice.com` holds `did=<did>` (exactly one distinct did). `core` takes the TXT lookup as a function; the web app uses DNS-over-HTTPS (`apps/web/src/lib/dns.ts`). Clients show a handle only after verifying it; the profile field alone proves nothing.
 
@@ -93,7 +99,7 @@ Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) 
 - `Publisher` owns the manifest. All changes go through a serial queue: build unsigned → sign → `block/put` (bytes stored as-is; the CID Kubo returns is checked against the local one) → `name/publish` → atomically write `<dataDir>/manifest.dagjson`. If any step fails, the in-memory and on-disk manifest stay at the previous version.
 - On startup it re-stores and republishes the saved manifest, in case Kubo's repo was reset.
 - `Kubo` is an interface; tests use `test/fake-kubo.ts`, and the HTTP API is tested with `app.inject`.
-- API: `GET /health`, `POST /pair`, `GET /me`, `PUT /profile`, `POST /posts`, `DELETE /posts/:cid`, `POST /media` (raw body), `POST /follows`, `DELETE /follows/:did`, `POST /likes`, `DELETE /likes/:cid`, `PUT /pinned`.
+- API: `GET /health`, `POST /pair`, `GET /me`, `PUT /profile`, `POST /posts`, `DELETE /posts/:cid`, `POST /media` (raw body), `POST /follows`, `DELETE /follows/:did`, `POST /likes`, `DELETE /likes/:cid`, `PUT /pinned`, `POST /messages`, `POST /messages/keys`. Validation errors are 400 (zod or `RangeError`), missing things 404 (`NotFoundError`).
 - Deleting a post in an older page rebuilds that page and every newer page (`removeFromPages`), then unpins the post block.
 - `Hoster` (`src/hoster.ts`): every 30 minutes it pins each followed profile's manifest, 20 newest posts and their images, and re-announces their signed IPNS record (`routing/put`), so profiles stay online while any follower is. It records only pins it created (`pin()` returns false for blocks already pinned recursively) and only ever removes those. State lives in `<dataDir>/hosted.json`; `SOCIALKEY_HOST_FOLLOWS=false` disables it. IPNS records are read from the gateway's `/routing/v1/ipns/` endpoint because RPC `routing/get` needs Kubo online.
 - `scripts/seed.ts` publishes a nine-person demo network (see README). With `ipfs daemon --offline` it runs in seconds and the local gateway resolves every demo name. Everything except `/health` and `/pair` requires `Authorization: Bearer <token>`.
@@ -105,7 +111,7 @@ Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) 
 - Your own manifest is fetched by the CID from `GET /me`, not via IPNS, so your changes show up immediately.
 - `src/lib/queries.ts`: posts are cached forever by CID, manifests for 60s. `useCircle` loads everyone you follow (20 posts each); `useExtendedNetwork` adds up to 120 friends of friends (5 posts each). Both are keyed by your follow list, not your manifest CID, so likes and posts don't reload the network. A profile or post that fails to resolve or verify is skipped, never fatal.
 - `src/lib/social.ts` holds the pure graph logic: suggestions, notifications, trending tags, reply/like/repost counts and search, all computed from the loaded `Network`. There is no server, so these only cover people within two follows; UI copy says so.
-- `AppContext` provides the merged network, toasts and the compose dialog to every page.
+- `AppContext` provides the merged network, toasts, the compose dialog and first-run onboarding to every page. Pages that need a paired agent are wrapped in `RequireAgent` (redirects to `/connect`).
 - After an agent write, invalidate `['me']`: the new manifest CID refreshes your own manifest and posts.
 - Helia (`@helia/verified-fetch`) is imported dynamically and only loads for visitors without a paired agent.
 - Share links use `VITE_PUBLIC_URL` when set; `VITE_DOWNLOAD_URL` makes the landing page's download button link out.
@@ -122,4 +128,4 @@ Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) 
 - Windows: every Kubo child process needs `windowsHide: true` (or a console window pops up), and `stop()` asks Kubo to shut down over the API because `kill()` on Windows terminates immediately. The tray uses the full-colour `tray-win.png`, since taskbars can be light or dark.
 
 ## Not built yet
-Direct messages, real-time updates (PubSub), a mobile app, an in-browser Helia node for posting without an agent, code signing / auto-update for the desktop app. There is no LICENSE yet, so don't describe the project as open source in UI copy.
+Real-time updates (PubSub), a mobile app, an in-browser Helia node for posting without an agent, code signing / auto-update for the desktop app. There is no LICENSE yet, so don't describe the project as open source in UI copy.

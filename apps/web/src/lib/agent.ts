@@ -85,6 +85,9 @@ export const agent = {
   like: (cid: string) => request<Written>('POST', '/likes', { cid }),
   unlike: (cid: string) => request<Written>('DELETE', `/likes/${cid}`),
   pin: (cid: string | null) => request<Written>('PUT', '/pinned', { cid }),
+  sendMessage: (to: string, text: string) => request<{ cid: string } & Written>('POST', '/messages', { to, text }),
+  conversationKeys: (dids: string[]) =>
+    request<{ keys: Record<string, { tag: string; key: string }> }>('POST', '/messages/keys', { dids }),
   uploadMedia: (file: File) =>
     request<{ cid: string }>('POST', '/media', file, file.type || 'application/octet-stream'),
   updateProfile: (input: ProfileInput) => request<Written>('PUT', '/profile', input),

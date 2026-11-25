@@ -2,10 +2,14 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  conversationWith,
   generateSecretKey,
   identityFromSecretKey,
   MAX_RECENT_POSTS,
+  openMessage,
   readManifest,
+  readMessage,
+  readMessagePage,
   readPost,
   readPostPage,
 } from '@socialkey/core'
@@ -154,5 +158,36 @@ describe('Publisher', () => {
     await publisher.init('Alice')
     const stranger = await kubo.putBlock(new TextEncoder().encode('{}'))
     await expect(publisher.deletePost(stranger.toString())).rejects.toThrow(NotFoundError)
+  })
+
+  it('sends encrypted messages that only the recipient can read', async () => {
+    const publisher = make()
+    await publisher.init('Alice')
+    const bob = identityFromSecretKey(generateSecretKey())
+    const { message } = await publisher.sendMessage(bob.did, 'secret plans')
+    await publisher.sendMessage(bob.did, 'more plans')
+
+    const head = readMessagePage(kubo.block(publisher.current.manifest.messages))
+    expect(head.messages).toHaveLength(2)
+    expect(head.messages[1]).toEqual(message)
+    const sealed = readMessage(kubo.block(message))
+    expect(new TextDecoder().decode(kubo.block(message))).not.toContain('secret')
+    expect(openMessage(conversationWith(bob.secretKey, bob.did, identity.did), identity.did, sealed)?.text).toBe(
+      'secret plans',
+    )
+  })
+
+  it('hands out the same conversation tag the other side derives', async () => {
+    const publisher = make()
+    await publisher.init('Alice')
+    const bob = identityFromSecretKey(generateSecretKey())
+    const keys = publisher.conversationKeys([bob.did])
+    expect(keys[bob.did]?.tag).toBe(conversationWith(bob.secretKey, bob.did, identity.did).tag)
+  })
+
+  it('rejects empty messages', async () => {
+    const publisher = make()
+    await publisher.init('Alice')
+    expect(() => publisher.sendMessage(identity.did, '  ')).toThrow(RangeError)
   })
 })

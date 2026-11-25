@@ -43,6 +43,8 @@ const ProfileBody = z.object({
   handle: optionalField,
 })
 const FollowBody = z.object({ did: didKey })
+const MessageBody = z.object({ to: didKey, text: z.string() })
+const KeysBody = z.object({ dids: z.array(didKey).max(500) })
 
 interface Deps {
   config: Config
@@ -81,6 +83,7 @@ export async function buildServer({ config, publisher, auth, hoster, logger = fa
       return reply.code(400).send({ error: 'Invalid input', issues: err.issues })
     }
     if (err instanceof NotFoundError) return reply.code(404).send({ error: err.message })
+    if (err instanceof RangeError) return reply.code(400).send({ error: err.message })
     reply.send(err)
   })
 
@@ -148,6 +151,14 @@ export async function buildServer({ config, publisher, auth, hoster, logger = fa
     const manifestCid = await publisher.pin(PinBody.parse(req.body).cid)
     return { manifestCid: manifestCid.toString() }
   })
+
+  app.post('/messages', async (req) => {
+    const { to, text } = MessageBody.parse(req.body)
+    const { message, manifest } = await publisher.sendMessage(to, text)
+    return { cid: message.toString(), manifestCid: manifest.toString() }
+  })
+
+  app.post('/messages/keys', async (req) => ({ keys: publisher.conversationKeys(KeysBody.parse(req.body).dids) }))
 
   app.post('/media', async (req, reply) => {
     if (!(req.body instanceof Buffer) || req.body.length === 0) {

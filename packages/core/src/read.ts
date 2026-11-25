@@ -1,6 +1,17 @@
 import type { z } from 'zod'
 import { decode } from './encoding'
-import { type Manifest, ManifestSchema, type Post, type PostPage, PostPageSchema, PostSchema } from './schemas'
+import {
+  type Manifest,
+  ManifestSchema,
+  type Message,
+  type MessagePage,
+  MessagePageSchema,
+  MessageSchema,
+  type Post,
+  type PostPage,
+  PostPageSchema,
+  PostSchema,
+} from './schemas'
 import { verify } from './sign'
 
 export class InvalidObjectError extends Error {}
@@ -20,6 +31,18 @@ export function readManifest(bytes: Uint8Array): Manifest {
 export function readPostPage(bytes: Uint8Array): PostPage {
   const result = PostPageSchema.safeParse(decode(bytes))
   if (!result.success) throw new InvalidObjectError(`Invalid post-page: ${result.error.message}`)
+  return result.data
+}
+
+export function readMessage(bytes: Uint8Array): Message {
+  const result = MessageSchema.safeParse(decode(bytes))
+  if (!result.success) throw new InvalidObjectError(`Invalid message: ${result.error.message}`)
+  return result.data
+}
+
+export function readMessagePage(bytes: Uint8Array): MessagePage {
+  const result = MessagePageSchema.safeParse(decode(bytes))
+  if (!result.success) throw new InvalidObjectError(`Invalid message page: ${result.error.message}`)
   return result.data
 }
 

@@ -1,7 +1,8 @@
-import { Bell, Compass, House, KeyRound, Search, Settings, SquarePen, User } from 'lucide-react'
+import { Bell, Compass, House, KeyRound, Mail, Search, Settings, SquarePen, User } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useMe, useOwnManifest } from '../lib/queries'
+import { useUnreadMessages } from '../pages/Messages'
 import { useUnreadCount } from '../pages/Notifications'
 import { useApp } from './AppContext'
 import { Avatar } from './Avatar'
@@ -24,6 +25,7 @@ export function Layout() {
   const own = useOwnManifest()
   const { compose } = useApp()
   const unread = useUnreadCount()
+  const unreadMessages = useUnreadMessages()
   const { pathname } = useLocation()
 
   const nav: { to: string; label: string; icon: ReactNode; badge?: number; end?: boolean }[] = [
@@ -32,6 +34,7 @@ export function Layout() {
     ...(me
       ? [
           { to: '/notifications', label: 'Notifications', icon: <Bell />, badge: unread },
+          { to: '/messages', label: 'Messages', icon: <Mail />, badge: unreadMessages },
           { to: `/u/${me.did}`, label: 'Profile', icon: <User /> },
           { to: '/settings', label: 'Settings', icon: <Settings /> },
         ]

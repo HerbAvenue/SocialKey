@@ -1,14 +1,19 @@
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import {
+  appendMessage,
   CID,
   cidOf,
+  conversationWith,
   emptyManifest,
   encode,
   follow,
   type Identity,
   like,
+  MAX_MESSAGE_LENGTH,
   type Manifest,
   ManifestSchema,
+  type Message,
+  MessageSchema,
   type Post,
   type PostPage,
   PostSchema,
@@ -16,12 +21,15 @@ import {
   ProfileSchema,
   prependPost,
   readManifest,
+  readMessagePage,
   readPost,
   readPostPage,
   removeRecentPost,
+  sealMessage,
   setPinned,
   sign,
   stripSignature,
+  toBase64,
   type UnsignedManifest,
   unfollow,
   unlike,
@@ -143,6 +151,38 @@ export class Publisher {
       await this.deps.kubo.unpin(target)
       return next
     })
+  }
+
+  /** Encrypts a direct message to `to` and adds it to your message pages. */
+  sendMessage(to: string, text: string): Promise<{ message: CID; manifest: CID }> {
+    if (!text.trim()) throw new RangeError('Message is empty')
+    if (text.length > MAX_MESSAGE_LENGTH)
+      throw new RangeError(`Messages are limited to ${MAX_MESSAGE_LENGTH} characters`)
+    let messageCid!: CID
+    return this.mutate(async (m) => {
+      const conversation = conversationWith(this.deps.identity.secretKey, m.author, to)
+      const sealed = sealMessage(conversation, m.author, { text, createdAt: this.now().toISOString() })
+      const message: Message = MessageSchema.parse({ type: 'message', version: 1, ...sealed })
+      messageCid = await this.store(encode(message))
+      const head = m.messages
+        ? { cid: m.messages, page: readMessagePage(await this.deps.kubo.getBlock(m.messages)) }
+        : undefined
+      return { ...m, messages: await this.store(encode(appendMessage(head, messageCid))) }
+    }).then((manifest) => ({ message: messageCid, manifest }))
+  }
+
+  /**
+   * Conversation keys and tags for decrypting messages with these people. Only
+   * handed to paired frontends, which already act with your key.
+   */
+  conversationKeys(dids: string[]): Record<string, { tag: string; key: string }> {
+    const { identity } = this.deps
+    return Object.fromEntries(
+      dids.map((did) => {
+        const { tag, key } = conversationWith(identity.secretKey, identity.did, did)
+        return [did, { tag, key: toBase64(key) }]
+      }),
+    )
   }
 
   addMedia(bytes: Uint8Array): Promise<CID> {

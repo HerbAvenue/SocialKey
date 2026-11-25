@@ -127,6 +127,7 @@ type Action =
     }
   | { at: number; by: string; like: string }
   | { at: number; by: string; repost: string }
+  | { at: number; by: string; dm: string; text: string }
 
 // `at` is minutes before now. Refs name posts so later actions can point at them.
 const ACTIONS: Action[] = [
@@ -236,6 +237,20 @@ const ACTIONS: Action[] = [
   },
   { at: 500, by: 'chloe', like: 'a4' },
   { at: 400, by: 'ben', repost: 'm1' },
+  {
+    at: 2300,
+    by: 'ada',
+    dm: 'main',
+    text: 'Hey Sam! Welcome aboard. Shout if you want help setting up a domain handle.',
+  },
+  { at: 2290, by: 'main', dm: 'ada', text: "Thanks Ada! I'd love that. Is it really just one DNS record?" },
+  {
+    at: 2280,
+    by: 'ada',
+    dm: 'main',
+    text: 'Yep: a TXT record at _socialkey.yourdomain. Settings shows you the exact value.',
+  },
+  { at: 150, by: 'chloe', dm: 'main', text: 'Loved your post about the chronological feed. Coffee next week?' },
   { at: 300, by: 'hiro', post: 'h2', text: 'Album artwork is done. Counting down to release day. #music', images: 1 },
   {
     at: 200,
@@ -249,7 +264,7 @@ const ACTIONS: Action[] = [
     at: 30,
     by: 'dev',
     post: 'd3',
-    text: 'Playtest build is up for friends. DM me... oh wait, we do not have DMs yet. Reply here! #gamedev',
+    text: 'Playtest build is up for friends. Send me a DM if you want a key! #gamedev',
   },
 ]
 
@@ -353,6 +368,8 @@ for (const action of ACTIONS.sort((a, b) => b.at - a.at)) {
       mentions: action.mention?.map((id) => get(id).did),
     })
     refs.set(action.post, post)
+  } else if ('dm' in action) {
+    await publisher.sendMessage(get(action.dm).did, action.text)
   } else if ('like' in action) {
     await publisher.like(ref(action.like))
   } else {

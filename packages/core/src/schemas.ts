@@ -7,6 +7,8 @@ export const MAX_POST_LENGTH = 1000
 export const MAX_MEDIA_PER_POST = 4
 export const MAX_MENTIONS = 20
 export const MAX_LIKES = 500
+export const MAX_MESSAGE_LENGTH = 4000
+export const MESSAGES_PER_PAGE = 50
 
 export const cidLink = z.custom<CID>((v) => CID.asCID(v) !== null, 'Expected a CID link')
 export const didKey = z.string().regex(/^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]+$/, 'Expected an Ed25519 did:key')
@@ -59,6 +61,8 @@ export const ManifestSchema = z.object({
   /** Posts this user liked, newest first. Likes are public, like on other networks. */
   likes: z.array(cidLink).max(MAX_LIKES).optional(),
   pinned: cidLink.optional(),
+  /** Newest page of this user's sent direct messages (encrypted; see dm.ts). */
+  messages: cidLink.optional(),
   sig: signature,
 })
 
@@ -70,8 +74,27 @@ export const PostPageSchema = z.object({
   prev: cidLink.optional(),
 })
 
+/** An encrypted direct message, stored by its sender. Only the tag is visible. */
+export const MessageSchema = z.object({
+  type: z.literal('message'),
+  version: z.literal(1),
+  tag: z.string().regex(/^[0-9a-f]{32}$/),
+  nonce: z.instanceof(Uint8Array).refine((b) => b.length === 24, 'Expected a 24-byte nonce'),
+  // Room for MAX_MESSAGE_LENGTH characters of UTF-8 plus JSON and the auth tag.
+  ciphertext: z.instanceof(Uint8Array).refine((b) => b.length <= MAX_MESSAGE_LENGTH * 4 + 256, 'Message too long'),
+})
+
+export const MessagePageSchema = z.object({
+  type: z.literal('message-page'),
+  version: z.literal(1),
+  messages: z.array(cidLink).min(1).max(MESSAGES_PER_PAGE),
+  prev: cidLink.optional(),
+})
+
 export type Profile = z.infer<typeof ProfileSchema>
 export type Post = z.infer<typeof PostSchema>
 export type Manifest = z.infer<typeof ManifestSchema>
 export type PostPage = z.infer<typeof PostPageSchema>
+export type Message = z.infer<typeof MessageSchema>
+export type MessagePage = z.infer<typeof MessagePageSchema>
 export type Unsigned<T extends { sig: Uint8Array }> = Omit<T, 'sig'>

@@ -1,6 +1,7 @@
 import { ArrowLeft, LoaderCircle } from 'lucide-react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { useNavigate } from 'react-router'
+import { Navigate, useNavigate } from 'react-router'
+import { useMe } from '../lib/queries'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
@@ -32,6 +33,14 @@ export function Button({
       {children}
     </button>
   )
+}
+
+/** Wraps pages that only work with a paired agent: sends visitors to /connect instead of a blank page. */
+export function RequireAgent({ children }: { children: ReactNode }) {
+  const me = useMe()
+  if (me.data) return children
+  if (me.isLoading) return <Spinner />
+  return <Navigate to="/connect" replace />
 }
 
 export function Spinner({ label }: { label?: string }) {

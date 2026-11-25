@@ -20,6 +20,7 @@ SocialKey has no database and no server. Each person runs a small app that hosts
 - **Hosted by you.** Your posts are stored on your computer and served over the peer-to-peer IPFS network.
 - **Signed by you.** Every post and profile update carries your Ed25519 signature. Nobody can fake a post from you, not even the nodes relaying it.
 - **Kept online by your friends.** The people who follow you keep a copy of your recent posts and re-announce your profile, so it stays reachable while your computer is off. You do the same for them.
+- **Private messages, no server.** Direct messages are end-to-end encrypted and stored in the sender's own profile, labelled so only the recipient can even tell they're addressed to them.
 - **Your feed, in order.** Posts from the people you follow, newest first. No algorithm, no ads, no tracking.
 - **Your domain, your name.** Prove you own a domain with one DNS record and use it as your handle, like `@alice.com`.
 - **Portable identity.** Your identity is a key (`did:key`), not a username on someone's server.
@@ -33,6 +34,7 @@ SocialKey has no database and no server. Each person runs a small app that hosts
 | ![Explore](docs/screenshots/explore.png) | ![Landing](docs/screenshots/landing.png) |
 | **Explore**: people your friends follow, trending hashtags and posts from friends of friends | **A public website** anyone can visit, even without the app |
 
+- End-to-end encrypted direct messages with unread badges
 - Posts with up to 4 images, replies and threads, reposts and quotes, likes, @mentions with autocomplete, #hashtags
 - Pin a post to your profile, delete posts (including old ones)
 - Search people and posts across your network; paste an ID or `@handle` to open any profile
@@ -115,5 +117,6 @@ SocialKey is early software. Things to know:
 
 - **No central index**, so search, notifications and follower counts only cover people within two follows of you.
 - **Visitors without the app** read profiles through public IPFS gateways. That works best while the profile's owner, or one of their followers, is online.
-- **Not yet built:** direct messages, real-time updates, a mobile app, code-signed installers and auto-update.
+- **Messages from strangers** only show up once they're within two follows of you (or you've messaged them first).
+- **Not yet built:** real-time updates, a mobile app, code-signed installers and auto-update.
 - **Deleting a post** removes it from your profile and your node, but people who already fetched it may still have a copy, as on any network.

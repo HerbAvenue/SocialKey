@@ -1,5 +1,14 @@
 import type { CID } from 'multiformats/cid'
-import { MAX_LIKES, MAX_RECENT_POSTS, type Manifest, POST_PAGE_SIZE, type PostPage, type Unsigned } from './schemas'
+import {
+  MAX_LIKES,
+  MAX_RECENT_POSTS,
+  type Manifest,
+  MESSAGES_PER_PAGE,
+  type MessagePage,
+  POST_PAGE_SIZE,
+  type PostPage,
+  type Unsigned,
+} from './schemas'
 
 export type UnsignedManifest = Unsigned<Manifest>
 
@@ -69,6 +78,16 @@ export function removeRecentPost(manifest: UnsignedManifest, post: CID): Unsigne
   if (!manifest.posts.some((c) => c.equals(post))) return null
   const pinned = manifest.pinned?.equals(post) ? undefined : manifest.pinned
   return { ...manifest, posts: manifest.posts.filter((c) => !c.equals(post)), pinned }
+}
+
+/**
+ * The next head of a sender's message-page chain: the message goes on the
+ * current page until it's full, then onto a new page that links back to it.
+ */
+export function appendMessage(head: { cid: CID; page: MessagePage } | undefined, message: CID): MessagePage {
+  if (!head) return { type: 'message-page', version: 1, messages: [message] }
+  if (head.page.messages.length < MESSAGES_PER_PAGE) return { ...head.page, messages: [message, ...head.page.messages] }
+  return { type: 'message-page', version: 1, messages: [message], prev: head.cid }
 }
 
 export function stripSignature<T extends { sig: Uint8Array }>(signed: T): Unsigned<T> {

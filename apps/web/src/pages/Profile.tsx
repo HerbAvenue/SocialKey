@@ -1,6 +1,17 @@
 import { type CID, didKey, normalizeHandle, type TimelineEntry } from '@socialkey/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, Copy, Link as LinkIcon, MapPin, Pin, QrCode as QrIcon, Share, WifiOff, X } from 'lucide-react'
+import {
+  BadgeCheck,
+  Copy,
+  Link as LinkIcon,
+  Mail,
+  MapPin,
+  Pin,
+  QrCode as QrIcon,
+  Share,
+  WifiOff,
+  X,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { useApp } from '../components/AppContext'
@@ -117,7 +128,19 @@ function ProfileView({ did }: { did: string }) {
                 <Button variant="secondary">Edit profile</Button>
               </Link>
             ) : (
-              <FollowButton did={did} size="md" />
+              <>
+                {me && (
+                  <Link
+                    to={`/messages/${did}`}
+                    aria-label="Message"
+                    title="Message"
+                    className="rounded-full border border-stone-300 p-2 hover:bg-stone-100 dark:border-stone-700 dark:hover:bg-stone-800"
+                  >
+                    <Mail className="size-5" />
+                  </Link>
+                )}
+                <FollowButton did={did} size="md" />
+              </>
             )}
           </div>
         </div>

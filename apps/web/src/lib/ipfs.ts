@@ -4,9 +4,13 @@ import {
   cidOf,
   didToIpnsName,
   type Manifest,
+  type Message,
+  type MessagePage,
   type Post,
   type PostPage,
   readManifest,
+  readMessage,
+  readMessagePage,
   readPost,
   readPostPage,
 } from '@socialkey/core'
@@ -96,6 +100,14 @@ export async function loadPost(cid: CID | string, signal?: AbortSignal): Promise
 
 export async function loadPostPage(cid: CID | string, signal?: AbortSignal): Promise<PostPage> {
   return readPostPage(await fetchBlock(`/ipfs/${cid}`, signal))
+}
+
+export async function loadMessagePage(cid: CID | string, signal?: AbortSignal): Promise<MessagePage> {
+  return readMessagePage(await fetchBlock(`/ipfs/${cid}`, signal))
+}
+
+export async function loadMessage(cid: CID | string, signal?: AbortSignal): Promise<Message> {
+  return readMessage(await fetchBlock(`/ipfs/${cid}`, signal))
 }
 
 /** A URL for a media file (UnixFS). */

@@ -1,5 +1,6 @@
 export { CID } from 'multiformats/cid'
 export * from './did'
+export * from './dm'
 export * from './encoding'
 export * from './handle'
 export * from './keys'
