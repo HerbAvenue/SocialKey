@@ -70,6 +70,20 @@ export class FakeKubo implements Kubo {
     this.reannounced.push(name)
   }
 
+  topics = new Map<string, Set<(data: Uint8Array) => void>>()
+
+  async pubsubPublish(topic: string, data: Uint8Array): Promise<void> {
+    for (const listener of this.topics.get(topic) ?? []) listener(data)
+  }
+
+  async pubsubSubscribe(topic: string, onMessage: (data: Uint8Array) => void, signal: AbortSignal): Promise<void> {
+    const listeners = this.topics.get(topic) ?? new Set()
+    listeners.add(onMessage)
+    this.topics.set(topic, listeners)
+    await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve()))
+    listeners.delete(onMessage)
+  }
+
   async addFile(bytes: Uint8Array): Promise<CID> {
     const cid = CID.createV1(raw.code, await sha256.digest(bytes))
     this.blocks.set(cid.toString(), bytes)

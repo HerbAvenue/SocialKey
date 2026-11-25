@@ -31,6 +31,15 @@ export interface Kubo {
   getIpnsRecord(name: string): Promise<Uint8Array>
   /** Re-announces someone's signed IPNS record. Kubo checks the signature. */
   putIpnsRecord(name: string, record: Uint8Array): Promise<void>
+  /** Broadcasts a message on a libp2p PubSub topic. */
+  pubsubPublish(topic: string, data: Uint8Array): Promise<void>
+  /** Delivers messages on a topic until `signal` aborts. Resolves when the subscription ends. */
+  pubsubSubscribe(topic: string, onMessage: (data: Uint8Array) => void, signal: AbortSignal): Promise<void>
+}
+
+/** Kubo's RPC wants PubSub topics and payloads multibase-encoded as base64url ("u" prefix). */
+function multibase(bytes: Uint8Array): string {
+  return `u${Buffer.from(bytes).toString('base64url')}`
 }
 
 export class KuboError extends Error {}
@@ -96,6 +105,34 @@ export class HttpKubo implements Kubo {
 
   async putIpnsRecord(name: string, record: Uint8Array): Promise<void> {
     await this.call('routing/put', { arg: `/ipns/${name}`, 'allow-offline': 'true' }, record)
+  }
+
+  async pubsubPublish(topic: string, data: Uint8Array): Promise<void> {
+    await this.request('pubsub/pub', { arg: multibase(new TextEncoder().encode(topic)) }, data)
+  }
+
+  async pubsubSubscribe(topic: string, onMessage: (data: Uint8Array) => void, signal: AbortSignal): Promise<void> {
+    const url = `${this.api}/api/v0/pubsub/sub?arg=${multibase(new TextEncoder().encode(topic))}`
+    const res = await fetch(url, { method: 'POST', signal })
+    if (!res.ok || !res.body) throw new KuboError(`Kubo pubsub/sub failed (${res.status}): ${await res.text()}`)
+    const decoder = new TextDecoder()
+    let buffered = ''
+    try {
+      for await (const chunk of res.body) {
+        buffered += decoder.decode(chunk, { stream: true })
+        let newline = buffered.indexOf('\n')
+        while (newline >= 0) {
+          const line = buffered.slice(0, newline).trim()
+          buffered = buffered.slice(newline + 1)
+          newline = buffered.indexOf('\n')
+          if (!line) continue
+          const { data } = JSON.parse(line) as { data?: string }
+          if (data?.startsWith('u')) onMessage(new Uint8Array(Buffer.from(data.slice(1), 'base64url')))
+        }
+      }
+    } catch (err) {
+      if (!signal.aborted) throw err
+    }
   }
 
   async addFile(bytes: Uint8Array): Promise<CID> {

@@ -61,6 +61,8 @@ interface Deps {
   stateFile: string
   now?: () => Date
   log?: (message: string) => void
+  /** Called as soon as a new manifest is saved, before it's published over IPNS. */
+  onCommitted?: (cid: CID) => void
   /** Called after each successful IPNS publish. */
   onPublished?: (cid: CID, manifest: Manifest) => void
   /** How long to wait before retrying a failed IPNS publish. */
@@ -328,6 +330,7 @@ export class Publisher {
     await rename(tmp, this.deps.stateFile)
     this.manifest = manifest
     this.manifestCid = cid
+    this.deps.onCommitted?.(cid)
     this.schedulePublish()
     return cid
   }

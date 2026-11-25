@@ -37,6 +37,7 @@ SocialKey has no database and no server. Each person runs a small app that hosts
 | **A public website** anyone can visit, even without the app | |
 
 - End-to-end encrypted direct messages with unread badges
+- New posts from people you follow arrive in about a second, pushed peer to peer over libp2p PubSub
 - Posts with up to 4 images, replies and threads, reposts and quotes, likes, @mentions with autocomplete, #hashtags
 - Pin a post to your profile, delete posts (including old ones)
 - Mute and block, with private lists that never leave your computer
@@ -127,5 +128,5 @@ SocialKey is early software. Things to know:
 - **No central index**, so search, notifications and follower counts only cover people within two follows of you.
 - **Visitors without the app** read profiles through public IPFS gateways. In a test on the live network, a profile hosted on a home computer behind a router loaded for a visitor in about 30 seconds; after that, it's cached and quick. It works while the profile's owner, or one of their followers, is online.
 - **Messages from strangers** only show up once they're within two follows of you (or you've messaged them first).
-- **Not yet built:** real-time updates, a mobile app, code-signed installers and auto-update.
+- **Not yet built:** a native mobile app, code-signed installers and auto-update.
 - **Deleting a post** removes it from your profile and your node, but people who already fetched it may still have a copy, as on any network.

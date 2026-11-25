@@ -48,7 +48,9 @@ export function postQuery(cid: string) {
 /** A user's manifest; your own is read by the CID the agent reports, skipping IPNS. */
 export function useManifest(did: string | undefined) {
   const me = useMe().data
-  const cid = did && did === me?.did ? me.manifestCid : undefined
+  const live = useLive()
+  // Your own newest manifest comes from the agent; other people's from PubSub when heard, else IPNS.
+  const cid = did && did === me?.did ? me.manifestCid : did ? live[did] : undefined
   return useQuery({
     ...manifestQuery(did ?? '', cid),
     enabled: did !== undefined,
@@ -147,8 +149,14 @@ async function mapSettled<T, R>(items: T[], limit: number, fn: (item: T) => Prom
   return out
 }
 
-async function loadPeople(client: QueryClient, dids: string[], depth: 1 | 2, postsEach: number): Promise<Network> {
-  const manifests = await mapSettled(dids, CONCURRENCY, (did) => client.fetchQuery(manifestQuery(did)))
+async function loadPeople(
+  client: QueryClient,
+  dids: string[],
+  depth: 1 | 2,
+  postsEach: number,
+  live: Record<string, string> = {},
+): Promise<Network> {
+  const manifests = await mapSettled(dids, CONCURRENCY, (did) => client.fetchQuery(manifestQuery(did, live[did])))
   const people = new Map<string, Person>()
   manifests.forEach((manifest, i) => {
     const did = dids[i]
@@ -162,19 +170,40 @@ async function loadPeople(client: QueryClient, dids: string[], depth: 1 | 2, pos
 }
 
 /** You and everyone you follow, with their recent posts. Feeds the home timeline. */
+/**
+ * Newest manifest CIDs your agent has heard over PubSub (already verified there).
+ * Polled often: it's a cheap local call, and it's how new posts appear within seconds.
+ */
+export function useLive(): Record<string, string> {
+  const me = useMe().data
+  return (
+    useQuery({
+      queryKey: ['live'],
+      queryFn: agent.live,
+      enabled: me !== undefined,
+      refetchInterval: 10_000,
+      retry: false,
+    }).data?.latest ?? EMPTY_LIVE
+  )
+}
+
+const EMPTY_LIVE: Record<string, string> = {}
+
 export function useCircle() {
   const client = useQueryClient()
   const own = useOwnManifest()
+  const live = useLive()
   return useQuery({
     // Keyed by who you follow, not your manifest CID: liking a post shouldn't reload everyone.
-    queryKey: ['network', 'circle', own?.author, own?.follows.join(',')],
+    // Live CIDs are in the key so a PubSub update refetches the circle right away.
+    queryKey: ['network', 'circle', own?.author, own?.follows.map((did) => `${did}@${live[did] ?? ''}`).join(',')],
     enabled: own !== undefined,
     staleTime: MANIFEST_TTL,
     // New posts from people you follow show up without reloading.
     refetchInterval: 2 * MANIFEST_TTL,
     queryFn: async (): Promise<Network> => {
       if (!own) return { people: new Map(), posts: [] }
-      return loadPeople(client, own.follows, 1, POSTS_PER_FOLLOW)
+      return loadPeople(client, own.follows, 1, POSTS_PER_FOLLOW, live)
     },
   })
 }

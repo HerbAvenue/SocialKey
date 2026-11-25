@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { type Auth, TooManyAttemptsError } from './auth'
 import type { Config } from './config'
 import type { Hoster } from './hoster'
+import type { Live } from './live'
 import type { Moderation } from './moderation'
 import { NotFoundError, type Publisher } from './publisher'
 
@@ -57,6 +58,7 @@ interface Deps {
   auth: Auth
   hoster?: Hoster
   moderation?: Moderation
+  live?: Live
   logger?: boolean
 }
 
@@ -66,6 +68,7 @@ export async function buildServer({
   auth,
   hoster,
   moderation,
+  live,
   logger = false,
 }: Deps): Promise<FastifyInstance> {
   const app = Fastify({ logger })
@@ -189,6 +192,9 @@ export async function buildServer({
   })
 
   app.post('/messages/keys', async (req) => ({ keys: publisher.conversationKeys(KeysBody.parse(req.body).dids) }))
+
+  // The newest verified manifest CIDs heard over PubSub, so frontends can skip slow IPNS lookups.
+  app.get('/live', async () => ({ latest: live?.latest() ?? {} }))
 
   app.get('/moderation', async () => moderation?.current ?? { muted: [], blocked: [] })
 
