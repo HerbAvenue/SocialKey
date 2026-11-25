@@ -61,6 +61,8 @@ interface Deps {
   stateFile: string
   now?: () => Date
   log?: (message: string) => void
+  /** Called after each successful IPNS publish. */
+  onPublished?: (cid: CID, manifest: Manifest) => void
   /** How long to wait before retrying a failed IPNS publish. */
   publishRetryMs?: number
 }
@@ -345,8 +347,10 @@ export class Publisher {
       if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs))
       const cid = this.manifestCid
       try {
+        const manifest = this.manifest
         await this.deps.kubo.publish(cid, this.deps.keyName)
         this.publishedCid = cid
+        this.deps.onPublished?.(cid, manifest)
       } catch (err) {
         this.deps.log?.(`IPNS publish failed, retrying: ${err instanceof Error ? err.message : err}`)
         this.publishAgain = true
@@ -358,6 +362,15 @@ export class Publisher {
       this.publishAgain = false
       if (again && !this.closed) this.schedulePublish(this.publishedCid?.equals(this.manifestCid) ? 0 : delayMs)
     })
+  }
+
+  /** The image CIDs in one of your posts (empty if it can't be read). */
+  async mediaOf(post: CID): Promise<CID[]> {
+    try {
+      return readPost(await this.deps.kubo.getBlock(post)).media
+    } catch {
+      return []
+    }
   }
 
   /** Waits for any IPNS publish in progress (and the follow-ups it scheduled). */

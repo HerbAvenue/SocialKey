@@ -9,6 +9,7 @@ import { HttpKubo } from './kubo'
 import { Moderation } from './moderation'
 import { Publisher } from './publisher'
 import { buildServer } from './server'
+import { Warmer } from './warmer'
 
 export interface RunningAgent {
   identity: Identity
@@ -34,12 +35,15 @@ export async function startAgent(
   const { identity, created } = await loadOrCreateIdentity(config.dataDir)
   await ensureKuboKey(kubo, config.keyName, identity)
 
-  const publisher = new Publisher({
+  const log = logger ? (message: string) => console.warn(message) : undefined
+  const warmer = config.warmGateways ? new Warmer({ log }) : undefined
+  const publisher: Publisher = new Publisher({
     kubo,
     identity,
     keyName: config.keyName,
     stateFile: join(config.dataDir, 'manifest.dagjson'),
-    log: logger ? (message) => console.warn(message) : undefined,
+    log,
+    onPublished: (cid, manifest) => warmer?.warm(identity.ipnsName, cid, manifest, (post) => publisher.mediaOf(post)),
   })
   // An existing key without saved state means a restore or reinstall: look for the profile online first.
   await publisher.init('Anonymous', { recover: !created })

@@ -16,6 +16,8 @@ export interface Config {
   hostFollows: boolean
   /** Accept connections from other devices on the local network (e.g. your phone), not just this computer. */
   lanAccess: boolean
+  /** After publishing, ask public gateways for your new content so visitors load it from their cache. */
+  warmGateways: boolean
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -35,5 +37,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     webRoot: env.SOCIALKEY_WEB_ROOT,
     hostFollows: env.SOCIALKEY_HOST_FOLLOWS !== 'false',
     lanAccess: env.SOCIALKEY_LAN === 'true',
+    warmGateways: env.SOCIALKEY_WARM_GATEWAYS !== 'false',
   }
 }
