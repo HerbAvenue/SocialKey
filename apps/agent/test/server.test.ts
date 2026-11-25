@@ -92,4 +92,13 @@ describe('agent HTTP API', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('web')
   })
+
+  it('likes, pins and deletes through the API', async () => {
+    const headers = { authorization: `Bearer ${await pair()}` }
+    const { cid } = (await app.inject({ method: 'POST', url: '/posts', headers, payload: { text: 'hi' } })).json()
+    expect((await app.inject({ method: 'POST', url: '/likes', headers, payload: { cid } })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'PUT', url: '/pinned', headers, payload: { cid } })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'DELETE', url: `/posts/${cid}`, headers })).statusCode).toBe(200)
+    expect((await app.inject({ method: 'DELETE', url: `/posts/${cid}`, headers })).statusCode).toBe(404)
+  })
 })

@@ -1,5 +1,5 @@
 import type { CID } from 'multiformats/cid'
-import { MAX_RECENT_POSTS, type Manifest, POST_PAGE_SIZE, type PostPage, type Unsigned } from './schemas'
+import { MAX_LIKES, MAX_RECENT_POSTS, type Manifest, POST_PAGE_SIZE, type PostPage, type Unsigned } from './schemas'
 
 export type UnsignedManifest = Unsigned<Manifest>
 
@@ -44,6 +44,31 @@ export function follow(manifest: UnsignedManifest, did: string): UnsignedManifes
 
 export function unfollow(manifest: UnsignedManifest, did: string): UnsignedManifest {
   return { ...manifest, follows: manifest.follows.filter((d) => d !== did) }
+}
+
+export function like(manifest: UnsignedManifest, post: CID): UnsignedManifest {
+  const likes = manifest.likes ?? []
+  if (likes.some((c) => c.equals(post))) return manifest
+  return { ...manifest, likes: [post, ...likes].slice(0, MAX_LIKES) }
+}
+
+export function unlike(manifest: UnsignedManifest, post: CID): UnsignedManifest {
+  const likes = (manifest.likes ?? []).filter((c) => !c.equals(post))
+  return { ...manifest, likes: likes.length ? likes : undefined }
+}
+
+export function setPinned(manifest: UnsignedManifest, post: CID | undefined): UnsignedManifest {
+  return { ...manifest, pinned: post }
+}
+
+/**
+ * Removes a post from the recent list (and unpins it). Returns null when it
+ * isn't there, i.e. it lives in an older page.
+ */
+export function removeRecentPost(manifest: UnsignedManifest, post: CID): UnsignedManifest | null {
+  if (!manifest.posts.some((c) => c.equals(post))) return null
+  const pinned = manifest.pinned?.equals(post) ? undefined : manifest.pinned
+  return { ...manifest, posts: manifest.posts.filter((c) => !c.equals(post)), pinned }
 }
 
 export function stripSignature<T extends { sig: Uint8Array }>(signed: T): Unsigned<T> {

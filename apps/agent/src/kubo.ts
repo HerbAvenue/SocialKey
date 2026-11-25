@@ -9,6 +9,10 @@ export interface KuboKey {
 export interface Kubo {
   /** Stores already-encoded DAG-JSON bytes as-is and pins them. */
   putBlock(bytes: Uint8Array): Promise<CID>
+  /** Reads a raw block. */
+  getBlock(cid: CID): Promise<Uint8Array>
+  /** Unpins a block so Kubo's garbage collector can remove it. Missing pins are ignored. */
+  unpin(cid: CID): Promise<void>
   /** Adds a file (media) as UnixFS and pins it. */
   addFile(bytes: Uint8Array): Promise<CID>
   publish(cid: CID, keyName: string): Promise<void>
@@ -29,6 +33,19 @@ export class HttpKubo implements Kubo {
       bytes,
     )
     return CID.parse(res.Key)
+  }
+
+  async getBlock(cid: CID): Promise<Uint8Array> {
+    const res = await this.request('block/get', { arg: cid.toString() })
+    return new Uint8Array(await res.arrayBuffer())
+  }
+
+  async unpin(cid: CID): Promise<void> {
+    try {
+      await this.call('pin/rm', { arg: cid.toString() })
+    } catch (err) {
+      if (!(err instanceof KuboError && /not pinned/.test(err.message))) throw err
+    }
   }
 
   async addFile(bytes: Uint8Array): Promise<CID> {
@@ -62,6 +79,13 @@ export class HttpKubo implements Kubo {
   }
 
   private async call<T = unknown>(command: string, params: Record<string, string>, file?: Uint8Array): Promise<T> {
+    const text = await (await this.request(command, params, file)).text()
+    // Some commands stream NDJSON; the final line holds the result.
+    const last = text.trim().split('\n').at(-1) ?? '{}'
+    return JSON.parse(last) as T
+  }
+
+  private async request(command: string, params: Record<string, string>, file?: Uint8Array): Promise<Response> {
     const url = `${this.api}/api/v0/${command}?${new URLSearchParams(params)}`
     let body: FormData | undefined
     if (file) {
@@ -74,10 +98,7 @@ export class HttpKubo implements Kubo {
     } catch (err) {
       throw new KuboError(`Cannot reach Kubo at ${this.api}: is \`ipfs daemon\` running?`, { cause: err })
     }
-    const text = await res.text()
-    if (!res.ok) throw new KuboError(`Kubo ${command} failed (${res.status}): ${text.trim()}`)
-    // Some commands stream NDJSON; the final line holds the result.
-    const last = text.trim().split('\n').at(-1) ?? '{}'
-    return JSON.parse(last) as T
+    if (!res.ok) throw new KuboError(`Kubo ${command} failed (${res.status}): ${(await res.text()).trim()}`)
+    return res
   }
 }

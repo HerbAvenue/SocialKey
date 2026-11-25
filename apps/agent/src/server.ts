@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { Auth } from './auth'
 import type { Config } from './config'
-import type { Publisher } from './publisher'
+import { NotFoundError, type Publisher } from './publisher'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024
 const PUBLIC_ROUTES = new Set(['/', '/health', '/pair'])
@@ -26,7 +26,11 @@ const PostBody = z.object({
   media: z.array(cidString).optional(),
   replyTo: cidString.optional(),
   quoteOf: cidString.optional(),
+  repostOf: cidString.optional(),
+  mentions: z.array(didKey).optional(),
 })
+const CidBody = z.object({ cid: cidString })
+const PinBody = z.object({ cid: cidString.nullable() })
 const optionalField = z.string().nullable().optional()
 const ProfileBody = z.object({
   displayName: z.string().optional(),
@@ -35,6 +39,7 @@ const ProfileBody = z.object({
   banner: cidString.nullable().optional(),
   website: optionalField,
   location: optionalField,
+  handle: optionalField,
 })
 const FollowBody = z.object({ did: didKey })
 
@@ -73,6 +78,7 @@ export async function buildServer({ config, publisher, auth, logger = false }: D
     if (err instanceof z.ZodError) {
       return reply.code(400).send({ error: 'Invalid input', issues: err.issues })
     }
+    if (err instanceof NotFoundError) return reply.code(404).send({ error: err.message })
     reply.send(err)
   })
 
@@ -107,6 +113,26 @@ export async function buildServer({ config, publisher, auth, logger = false }: D
   app.post('/posts', async (req) => {
     const { post, manifest } = await publisher.createPost(PostBody.parse(req.body))
     return { cid: post.toString(), manifestCid: manifest.toString() }
+  })
+
+  app.delete<{ Params: { cid: string } }>('/posts/:cid', async (req) => {
+    const manifestCid = await publisher.deletePost(cidString.parse(req.params.cid))
+    return { manifestCid: manifestCid.toString() }
+  })
+
+  app.post('/likes', async (req) => {
+    const manifestCid = await publisher.like(CidBody.parse(req.body).cid)
+    return { manifestCid: manifestCid.toString() }
+  })
+
+  app.delete<{ Params: { cid: string } }>('/likes/:cid', async (req) => {
+    const manifestCid = await publisher.unlike(cidString.parse(req.params.cid))
+    return { manifestCid: manifestCid.toString() }
+  })
+
+  app.put('/pinned', async (req) => {
+    const manifestCid = await publisher.pin(PinBody.parse(req.body).cid)
+    return { manifestCid: manifestCid.toString() }
   })
 
   app.post('/media', async (req, reply) => {

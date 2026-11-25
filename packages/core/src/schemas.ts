@@ -5,11 +5,21 @@ export const MAX_RECENT_POSTS = 50
 export const POST_PAGE_SIZE = 25
 export const MAX_POST_LENGTH = 1000
 export const MAX_MEDIA_PER_POST = 4
+export const MAX_MENTIONS = 20
+export const MAX_LIKES = 500
 
 export const cidLink = z.custom<CID>((v) => CID.asCID(v) !== null, 'Expected a CID link')
 export const didKey = z.string().regex(/^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]+$/, 'Expected an Ed25519 did:key')
 const signature = z.instanceof(Uint8Array).refine((b) => b.length === 64, 'Expected a 64-byte signature')
 const timestamp = z.iso.datetime()
+/** A domain the user controls, proven by a `_socialkey.<domain>` DNS TXT record (see `handle.ts`). */
+export const handle = z
+  .string()
+  .max(253)
+  .regex(
+    /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/,
+    'Expected a domain like alice.example.com',
+  )
 
 export const ProfileSchema = z.object({
   displayName: z.string().trim().min(1).max(64),
@@ -18,6 +28,7 @@ export const ProfileSchema = z.object({
   banner: cidLink.optional(),
   website: z.url().max(200).optional(),
   location: z.string().max(64).optional(),
+  handle: handle.optional(),
 })
 
 export const PostSchema = z.object({
@@ -29,6 +40,10 @@ export const PostSchema = z.object({
   media: z.array(cidLink).max(MAX_MEDIA_PER_POST),
   replyTo: cidLink.optional(),
   quoteOf: cidLink.optional(),
+  /** A repost has empty text and no media; it shares `repostOf` with the reposter's followers. */
+  repostOf: cidLink.optional(),
+  /** People the text mentions, so their apps can notify them. */
+  mentions: z.array(didKey).max(MAX_MENTIONS).optional(),
   sig: signature,
 })
 
@@ -41,6 +56,9 @@ export const ManifestSchema = z.object({
   follows: z.array(didKey),
   posts: z.array(cidLink).max(MAX_RECENT_POSTS),
   olderPosts: cidLink.optional(),
+  /** Posts this user liked, newest first. Likes are public, like on other networks. */
+  likes: z.array(cidLink).max(MAX_LIKES).optional(),
+  pinned: cidLink.optional(),
   sig: signature,
 })
 

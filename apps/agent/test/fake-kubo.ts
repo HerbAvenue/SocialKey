@@ -6,6 +6,7 @@ import type { Kubo, KuboKey } from '../src/kubo'
 export class FakeKubo implements Kubo {
   blocks = new Map<string, Uint8Array>()
   published: { cid: CID; keyName: string }[] = []
+  unpinned: CID[] = []
   keys: KuboKey[] = []
   failPublish = false
 
@@ -20,6 +21,14 @@ export class FakeKubo implements Kubo {
     const cid = await cidOf(bytes)
     this.blocks.set(cid.toString(), bytes)
     return cid
+  }
+
+  async getBlock(cid: CID): Promise<Uint8Array> {
+    return this.block(cid)
+  }
+
+  async unpin(cid: CID): Promise<void> {
+    this.unpinned.push(cid)
   }
 
   async addFile(bytes: Uint8Array): Promise<CID> {

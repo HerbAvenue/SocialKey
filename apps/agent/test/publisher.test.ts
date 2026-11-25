@@ -10,7 +10,7 @@ import {
   readPostPage,
 } from '@socialkey/core'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { Publisher } from '../src/publisher'
+import { NotFoundError, Publisher } from '../src/publisher'
 import { FakeKubo } from './fake-kubo'
 
 const identity = identityFromSecretKey(generateSecretKey())
@@ -95,5 +95,64 @@ describe('Publisher', () => {
     await publisher.updateProfile({ bio: 'hello', website: 'https://example.com' })
     await publisher.updateProfile({ bio: null })
     expect(publisher.current.manifest.profile).toEqual({ displayName: 'Alice', website: 'https://example.com' })
+  })
+
+  it('likes and unlikes posts', async () => {
+    const publisher = make()
+    await publisher.init('Alice')
+    const { post } = await publisher.createPost({ text: 'nice' })
+    await publisher.like(post.toString())
+    expect(publisher.current.manifest.likes).toEqual([post])
+    await publisher.unlike(post.toString())
+    expect(publisher.current.manifest.likes).toBeUndefined()
+  })
+
+  it('creates reposts and records mentions', async () => {
+    const publisher = make()
+    await publisher.init('Alice')
+    const { post: original } = await publisher.createPost({ text: 'original' })
+    const bob = identityFromSecretKey(generateSecretKey()).did
+    const { post } = await publisher.createPost({ text: '', repostOf: original.toString(), mentions: [bob, bob] })
+    const read = readPost(kubo.block(post))
+    expect(read.repostOf).toEqual(original)
+    expect(read.mentions).toEqual([bob])
+  })
+
+  it('deletes a recent post, unpins it and clears its pin', async () => {
+    const publisher = make()
+    await publisher.init('Alice')
+    const { post } = await publisher.createPost({ text: 'oops' })
+    await publisher.pin(post.toString())
+    await publisher.deletePost(post.toString())
+    expect(publisher.current.manifest.posts).toEqual([])
+    expect(publisher.current.manifest.pinned).toBeUndefined()
+    expect(kubo.unpinned).toEqual([post])
+  })
+
+  it('deletes a post that has moved into an older page', async () => {
+    const publisher = make()
+    await publisher.init('Alice')
+    const posts = []
+    for (let i = 0; i < MAX_RECENT_POSTS + 30; i++) posts.push((await publisher.createPost({ text: `post ${i}` })).post)
+    const oldest = posts[0]
+    if (!oldest) throw new Error('no posts')
+    await publisher.deletePost(oldest.toString())
+
+    // Walk the whole chain: every post but the deleted one is still reachable.
+    const reachable = [...publisher.current.manifest.posts]
+    for (let next = publisher.current.manifest.olderPosts; next; ) {
+      const page = readPostPage(kubo.block(next))
+      reachable.push(...page.posts)
+      next = page.prev
+    }
+    expect(reachable).toHaveLength(posts.length - 1)
+    expect(reachable.some((c) => c.equals(oldest))).toBe(false)
+  })
+
+  it('refuses to delete a post that is not yours', async () => {
+    const publisher = make()
+    await publisher.init('Alice')
+    const stranger = await kubo.putBlock(new TextEncoder().encode('{}'))
+    await expect(publisher.deletePost(stranger.toString())).rejects.toThrow(NotFoundError)
   })
 })
