@@ -226,7 +226,7 @@ SOCIALKEY_DATA_DIR=/tmp/demo-user pnpm --filter @socialkey/agent dev
 
 <br>
 
-- **Installers:** push a tag like `v0.6.0`. The Release workflow builds the Windows, macOS and Linux apps, each on its own OS, and attaches them to a draft GitHub release.
+- **Installers:** push a tag like `v0.6.0`. The Release workflow builds the Windows, Linux and macOS (Apple Silicon and Intel) apps, each on its own OS, and attaches them to a draft GitHub release. Run the workflow by hand to build them without making a release.
 - **The website, on IPFS:** build with `VITE_PUBLIC_URL` (where the site will live, used in share links) and `VITE_DOWNLOAD_URL` (your releases page), then run `pnpm --filter @socialkey/web publish:ipfs`. It prints the CID, gateway links and the DNSLink record for serving it from your own domain.
 
 </details>

@@ -12,6 +12,7 @@
     "start": "node build.mjs && electron .",
     "dist": "pnpm run build && node scripts/fetch-kubo.cjs && electron-builder",
     "dist:linux": "pnpm run build && node scripts/fetch-kubo.cjs linux x64 && electron-builder --linux --x64",
+    "dist:mac": "pnpm run build && node scripts/fetch-kubo.cjs mac x64 && node scripts/fetch-kubo.cjs mac arm64 && electron-builder --mac --x64 --arm64",
     "dist:win": "pnpm run build && node scripts/fetch-kubo.cjs win x64 && electron-builder --win --x64",
     "typecheck": "tsc -p ."
   },
