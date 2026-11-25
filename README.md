@@ -31,8 +31,10 @@ SocialKey has no database and no server. Each person runs a small app that hosts
 |---|---|
 | ![Profile](docs/screenshots/profile.png) | ![Notifications](docs/screenshots/notifications.png) |
 | **Profiles** with banners, bios, pinned posts, and Posts / Replies / Media / Likes tabs | **Notifications** for replies, mentions, likes, reposts and new followers |
-| ![Explore](docs/screenshots/explore.png) | ![Landing](docs/screenshots/landing.png) |
-| **Explore**: people your friends follow, trending hashtags and posts from friends of friends | **A public website** anyone can visit, even without the app |
+| ![Explore](docs/screenshots/explore.png) | ![Messages](docs/screenshots/messages.png) |
+| **Explore**: people your friends follow, trending hashtags and posts from friends of friends | **Encrypted messages** stored on your own computers, readable only by the two of you |
+| ![Landing](docs/screenshots/landing.png) | |
+| **A public website** anyone can visit, even without the app | |
 
 - End-to-end encrypted direct messages with unread badges
 - Posts with up to 4 images, replies and threads, reposts and quotes, likes, @mentions with autocomplete, #hashtags
