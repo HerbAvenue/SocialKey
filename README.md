@@ -69,6 +69,11 @@ pnpm --filter @socialkey/desktop dist:win   # Windows installer (needs Wine on L
 
 To work on the web app against the command-line agent, run a Kubo daemon (`ipfs daemon`), then `pnpm dev`, and enter the pairing code the agent prints.
 
+#### Publishing
+
+- **Installers:** push a tag like `v0.3.0` and the Release workflow builds the Windows, macOS and Linux apps on their own OSes and attaches them to a draft GitHub release. Builds are unsigned for now.
+- **The website, on IPFS:** build with `VITE_PUBLIC_URL` (where the site will live, used for share links) and `VITE_DOWNLOAD_URL` (your releases page), then `pnpm --filter @socialkey/web publish:ipfs`. It prints the CID, gateway links and the DNSLink record to serve it from your own domain.
+
 #### A demo network
 
 `apps/agent/scripts/seed.ts` publishes nine demo people with profiles, posts, replies, likes, reposts and follows to a Kubo node, which is how the screenshots above were made:

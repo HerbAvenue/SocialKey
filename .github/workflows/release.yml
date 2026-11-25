@@ -1,0 +1,52 @@
+name: Release
+
+# Push a tag like v0.3.0 to build installers on each OS and attach them to a draft release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            files: apps/desktop/release/*.AppImage
+          - os: windows-latest
+            files: apps/desktop/release/*.exe
+          - os: macos-latest
+            files: apps/desktop/release/*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      # Builds the web app, fetches Kubo for this OS, and packages the desktop app (unsigned).
+      - run: pnpm --filter @socialkey/desktop dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: socialkey-${{ matrix.os }}
+          path: ${{ matrix.files }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --draft --generate-notes --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
