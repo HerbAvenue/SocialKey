@@ -19,12 +19,27 @@ export interface Kubo {
   listKeys(): Promise<KuboKey[]>
   /** Imports a libp2p protobuf-encoded private key. */
   importKey(name: string, protobufKey: Uint8Array): Promise<void>
+  /**
+   * Pins a block (direct) or a whole DAG (recursive), fetching it from the network if needed.
+   * Returns false when it was already pinned recursively, i.e. by someone else's pin.
+   */
+  pin(cid: CID, recursive: boolean): Promise<boolean>
+  /** The CID an IPNS name currently points to. */
+  resolveName(name: string): Promise<CID>
+  /** The signed IPNS record behind a name, as raw bytes. */
+  getIpnsRecord(name: string): Promise<Uint8Array>
+  /** Re-announces someone's signed IPNS record. Kubo checks the signature. */
+  putIpnsRecord(name: string, record: Uint8Array): Promise<void>
 }
 
 export class KuboError extends Error {}
 
 export class HttpKubo implements Kubo {
-  constructor(private readonly api: string) {}
+  /** `gateway` serves IPNS records over the routing API, which also works while Kubo is offline. */
+  constructor(
+    private readonly api: string,
+    private readonly gateway?: string,
+  ) {}
 
   async putBlock(bytes: Uint8Array): Promise<CID> {
     const res = await this.call<{ Key: string }>(
@@ -46,6 +61,36 @@ export class HttpKubo implements Kubo {
     } catch (err) {
       if (!(err instanceof KuboError && /not pinned/.test(err.message))) throw err
     }
+  }
+
+  async pin(cid: CID, recursive: boolean): Promise<boolean> {
+    try {
+      await this.call('pin/add', { arg: cid.toString(), recursive: String(recursive) })
+      return true
+    } catch (err) {
+      if (err instanceof KuboError && /already pinned recursively/.test(err.message)) return false
+      throw err
+    }
+  }
+
+  async resolveName(name: string): Promise<CID> {
+    const res = await this.call<{ Path: string }>('name/resolve', { arg: name, recursive: 'true' })
+    return CID.parse(res.Path.replace(/^\/ipfs\//, ''))
+  }
+
+  async getIpnsRecord(name: string): Promise<Uint8Array> {
+    if (!this.gateway)
+      return new Uint8Array(await (await this.request('routing/get', { arg: `/ipns/${name}` })).arrayBuffer())
+    const res = await fetch(`${this.gateway}/routing/v1/ipns/${name}`, {
+      headers: { accept: 'application/vnd.ipfs.ipns-record' },
+      signal: AbortSignal.timeout(60_000),
+    })
+    if (!res.ok) throw new KuboError(`No IPNS record found for ${name} (${res.status})`)
+    return new Uint8Array(await res.arrayBuffer())
+  }
+
+  async putIpnsRecord(name: string, record: Uint8Array): Promise<void> {
+    await this.call('routing/put', { arg: `/ipns/${name}`, 'allow-offline': 'true' }, record)
   }
 
   async addFile(bytes: Uint8Array): Promise<CID> {

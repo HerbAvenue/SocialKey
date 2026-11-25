@@ -5,6 +5,7 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import type { Auth } from './auth'
 import type { Config } from './config'
+import type { Hoster } from './hoster'
 import { NotFoundError, type Publisher } from './publisher'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024
@@ -47,10 +48,11 @@ interface Deps {
   config: Config
   publisher: Publisher
   auth: Auth
+  hoster?: Hoster
   logger?: boolean
 }
 
-export async function buildServer({ config, publisher, auth, logger = false }: Deps): Promise<FastifyInstance> {
+export async function buildServer({ config, publisher, auth, hoster, logger = false }: Deps): Promise<FastifyInstance> {
   const app = Fastify({ logger })
 
   await app.register(cors, {
@@ -113,6 +115,7 @@ export async function buildServer({ config, publisher, auth, logger = false }: D
       ipnsName: publisher.ipnsName,
       manifestCid: cid.toString(),
       gateway: config.kuboGateway,
+      hosting: hoster?.status() ?? { enabled: false, profiles: 0 },
     }
   })
 

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { Identity } from '@socialkey/core'
 import { Auth } from './auth'
 import type { Config } from './config'
+import { Hoster } from './hoster'
 import { ensureKuboKey, loadOrCreateIdentity } from './keystore'
 import { HttpKubo } from './kubo'
 import { Publisher } from './publisher'
@@ -14,6 +15,8 @@ export interface RunningAgent {
   created: boolean
   publisher: Publisher
   auth: Auth
+  /** Present when `config.hostFollows` is on. */
+  hoster?: Hoster
   /** Base URL of the HTTP API, e.g. http://127.0.0.1:4040 */
   url: string
   close(): Promise<void>
@@ -26,7 +29,7 @@ export async function startAgent(
 ): Promise<RunningAgent> {
   await mkdir(config.dataDir, { recursive: true, mode: 0o700 })
 
-  const kubo = new HttpKubo(config.kuboApi)
+  const kubo = new HttpKubo(config.kuboApi, config.kuboGateway)
   const { identity, created } = await loadOrCreateIdentity(config.dataDir)
   await ensureKuboKey(kubo, config.keyName, identity)
 
@@ -38,8 +41,18 @@ export async function startAgent(
   })
   await publisher.init('Anonymous')
 
+  const hoster = config.hostFollows
+    ? new Hoster({
+        kubo,
+        follows: () => publisher.current.manifest.follows,
+        stateFile: join(config.dataDir, 'hosted.json'),
+        log: logger ? (message) => console.warn(message) : undefined,
+      })
+    : undefined
+  await hoster?.start()
+
   const auth = await Auth.load(join(config.dataDir, 'tokens.json'), onPairingCode)
-  const app = await buildServer({ config, publisher, auth, logger })
+  const app = await buildServer({ config, publisher, auth, hoster, logger })
   await app.listen({ host: config.host, port: config.port })
 
   return {
@@ -47,7 +60,11 @@ export async function startAgent(
     created,
     publisher,
     auth,
+    hoster,
     url: `http://${config.host}:${config.port}`,
-    close: () => app.close(),
+    close: async () => {
+      hoster?.stop()
+      await app.close()
+    },
   }
 }

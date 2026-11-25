@@ -12,6 +12,8 @@ export interface Config {
   allowedOrigins: string[]
   /** Built web app to serve at /app/, if any. */
   webRoot?: string
+  /** Help keep the people you follow online by hosting their recent posts. */
+  hostFollows: boolean
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -28,5 +30,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .map((o) => o.trim())
       .filter(Boolean),
     webRoot: env.SOCIALKEY_WEB_ROOT,
+    hostFollows: env.SOCIALKEY_HOST_FOLLOWS !== 'false',
   }
 }

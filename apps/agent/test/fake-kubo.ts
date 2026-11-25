@@ -7,8 +7,16 @@ export class FakeKubo implements Kubo {
   blocks = new Map<string, Uint8Array>()
   published: { cid: CID; keyName: string }[] = []
   unpinned: CID[] = []
+  pins = new Map<string, 'direct' | 'recursive'>()
+  /** keyName → IPNS name, so publish() can record what each name resolves to. */
+  keyNames = new Map<string, string>()
+  names = new Map<string, CID>()
+  records = new Map<string, Uint8Array>()
+  reannounced: string[] = []
   keys: KuboKey[] = []
   failPublish = false
+  /** Mimic Kubo's block/put pin=true, which pins recursively. */
+  pinOnPut = false
 
   /** Returns stored bytes, failing the test if the block is missing. */
   block(cid: CID | undefined): Uint8Array {
@@ -20,6 +28,7 @@ export class FakeKubo implements Kubo {
   async putBlock(bytes: Uint8Array): Promise<CID> {
     const cid = await cidOf(bytes)
     this.blocks.set(cid.toString(), bytes)
+    if (this.pinOnPut) this.pins.set(cid.toString(), 'recursive')
     return cid
   }
 
@@ -29,6 +38,30 @@ export class FakeKubo implements Kubo {
 
   async unpin(cid: CID): Promise<void> {
     this.unpinned.push(cid)
+    this.pins.delete(cid.toString())
+  }
+
+  async pin(cid: CID, recursive: boolean): Promise<boolean> {
+    this.block(cid)
+    if (this.pins.get(cid.toString()) === 'recursive') return false
+    this.pins.set(cid.toString(), recursive ? 'recursive' : 'direct')
+    return true
+  }
+
+  async resolveName(name: string): Promise<CID> {
+    const cid = this.names.get(name)
+    if (!cid) throw new Error(`Could not resolve ${name}`)
+    return cid
+  }
+
+  async getIpnsRecord(name: string): Promise<Uint8Array> {
+    const record = this.records.get(name)
+    if (!record) throw new Error(`No record for ${name}`)
+    return record
+  }
+
+  async putIpnsRecord(name: string): Promise<void> {
+    this.reannounced.push(name)
   }
 
   async addFile(bytes: Uint8Array): Promise<CID> {
@@ -40,6 +73,11 @@ export class FakeKubo implements Kubo {
   async publish(cid: CID, keyName: string): Promise<void> {
     if (this.failPublish) throw new Error('publish failed')
     this.published.push({ cid, keyName })
+    const name = this.keyNames.get(keyName)
+    if (name) {
+      this.names.set(name, cid)
+      this.records.set(name, new TextEncoder().encode(`record for ${cid}`))
+    }
   }
 
   async listKeys(): Promise<KuboKey[]> {
