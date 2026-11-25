@@ -18,6 +18,7 @@ import {
 import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { agent } from '../lib/agent'
+import { copyText } from '../lib/clipboard'
 import { useManifest, useMe, useOwnManifest, usePost, useVerifiedHandle } from '../lib/queries'
 import { postLink } from '../lib/share'
 import { isRepost, likers, repliesTo, repostsOf } from '../lib/social'
@@ -309,7 +310,7 @@ function PostActions({ cid, post, large }: { cid: CID; post: Post; large: boolea
         label="Copy link"
         hover="hover:text-brand-500 hover:bg-brand-500/10"
         onClick={stop(async () => {
-          await navigator.clipboard.writeText(postLink(cid.toString()))
+          await copyText(postLink(cid.toString()))
           toast('Link copied')
         })}
       >
@@ -420,7 +421,7 @@ function OwnPostMenu({ cid, pinned }: { cid: CID; pinned: boolean }) {
           label: 'Copy post ID',
           icon: <LinkIcon className="size-4" />,
           onClick: async () => {
-            await navigator.clipboard.writeText(cid.toString())
+            await copyText(cid.toString())
             toast('Post ID copied')
           },
         },

@@ -25,6 +25,7 @@ import { PostList } from '../components/PostList'
 import { PostText } from '../components/PostText'
 import { QrCode } from '../components/QrCode'
 import { Button, EmptyState, PageHeader, PostSkeleton, Spinner, Tabs } from '../components/ui'
+import { copyText } from '../lib/clipboard'
 import {
   fetchPosts,
   loadOlderPosts,
@@ -315,7 +316,7 @@ function ShareMenu({
             label: 'Copy profile link',
             icon: <LinkIcon className="size-4" />,
             onClick: async () => {
-              await navigator.clipboard.writeText(link)
+              await copyText(link)
               toast('Link copied')
             },
           },
@@ -323,7 +324,7 @@ function ShareMenu({
             label: 'Copy SocialKey ID',
             icon: <Copy className="size-4" />,
             onClick: async () => {
-              await navigator.clipboard.writeText(did)
+              await copyText(did)
               toast('ID copied')
             },
           },

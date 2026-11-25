@@ -12,6 +12,7 @@ import { useModerate } from '../components/PostCard'
 import { QrCode } from '../components/QrCode'
 import { Button, Card, inputClass, PageHeader, Spinner } from '../components/ui'
 import { agent } from '../lib/agent'
+import { copyText } from '../lib/clipboard'
 import { AGENT_URL } from '../lib/config'
 import { didForHandle } from '../lib/dns'
 import { useMe, useModeration, useOwnManifest } from '../lib/queries'
@@ -274,7 +275,7 @@ function CopyButton({ text }: { text: string }) {
       type="button"
       aria-label="Copy"
       onClick={async () => {
-        await navigator.clipboard.writeText(text)
+        await copyText(text)
         toast('Copied')
       }}
       className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800"

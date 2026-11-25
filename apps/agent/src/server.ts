@@ -3,14 +3,17 @@ import fastifyStatic from '@fastify/static'
 import { CID, didKey } from '@socialkey/core'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import type { Auth } from './auth'
+import { type Auth, TooManyAttemptsError } from './auth'
 import type { Config } from './config'
 import type { Hoster } from './hoster'
 import type { Moderation } from './moderation'
 import { NotFoundError, type Publisher } from './publisher'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024
-const PUBLIC_ROUTES = new Set(['/', '/health', '/pair'])
+// Gateway paths are proxied to Kubo so other devices (and the web app) can read content through
+// the agent's address. They only serve public, content-addressed data, so they need no token.
+const GATEWAY_ROUTES = ['/ipfs/*', '/ipns/*', '/routing/v1/ipns/:name']
+const PUBLIC_ROUTES = new Set(['/', '/health', '/pair', ...GATEWAY_ROUTES])
 const WEB_PREFIX = '/app/'
 
 const cidString = z.string().refine((s) => {
@@ -94,6 +97,7 @@ export async function buildServer({
     }
     if (err instanceof NotFoundError) return reply.code(404).send({ error: err.message })
     if (err instanceof RangeError) return reply.code(400).send({ error: err.message })
+    if (err instanceof TooManyAttemptsError) return reply.code(429).send({ error: err.message })
     reply.send(err)
   })
 
@@ -116,18 +120,34 @@ export async function buildServer({
   app.get('/health', async () => ({ ok: true }))
 
   app.post('/pair', async (req, reply) => {
-    const token = await auth.pair(PairBody.parse(req.body).code)
+    const token = await auth.pair(PairBody.parse(req.body).code, req.ip)
     if (!token) return reply.code(403).send({ error: 'Wrong pairing code' })
     return { token }
   })
 
-  app.get('/me', async () => {
+  for (const route of GATEWAY_ROUTES) {
+    app.get(route, async (req, reply) => {
+      const upstream = await fetch(`${config.kuboGateway}${req.url}`, {
+        headers: { accept: req.headers.accept ?? '*/*' },
+        signal: AbortSignal.timeout(120_000),
+      })
+      reply.code(upstream.status)
+      for (const header of ['content-type', 'cache-control', 'etag', 'x-ipfs-path']) {
+        const value = upstream.headers.get(header)
+        if (value) reply.header(header, value)
+      }
+      return reply.send(Buffer.from(await upstream.arrayBuffer()))
+    })
+  }
+
+  app.get('/me', async (req) => {
     const { manifest, cid } = publisher.current
     return {
       did: manifest.author,
       ipnsName: publisher.ipnsName,
       manifestCid: cid.toString(),
-      gateway: config.kuboGateway,
+      // Content is read through the agent's own address, which also works from other devices.
+      gateway: `${req.protocol}://${req.host}`,
       hosting: hoster?.status() ?? { enabled: false, profiles: 0 },
     }
   })

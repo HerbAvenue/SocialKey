@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, networkInterfaces } from 'node:os'
 import { join } from 'node:path'
 import {
   HttpKubo,
@@ -27,8 +27,15 @@ let tray: Tray | null = null
 let agent: RunningAgent | null = null
 let peerTimer: NodeJS.Timeout | undefined
 let quitting = false
-let state: AppState = { phase: 'starting', peers: 0, autostart: false, hostFollows: true, hostedProfiles: 0 }
-let settings: Settings = { hostFollows: true }
+let state: AppState = {
+  phase: 'starting',
+  peers: 0,
+  autostart: false,
+  hostFollows: true,
+  hostedProfiles: 0,
+  lanAccess: false,
+}
+let settings: Settings = { hostFollows: true, lanAccess: false }
 
 const kubo = new KuboDaemon(kuboBinary(), join(DATA_DIR, 'kubo'), KUBO_PORTS)
 const webRoot = app.isPackaged ? join(process.resourcesPath, 'web') : join(__dirname, '../../web/dist')
@@ -62,6 +69,8 @@ async function startServices(): Promise<void> {
         dataDir: DATA_DIR,
         webRoot: existsSync(webRoot) ? webRoot : undefined,
         hostFollows: settings.hostFollows,
+        lanAccess: settings.lanAccess,
+        host: settings.lanAccess ? '0.0.0.0' : '127.0.0.1',
       },
       { onPairingCode: (pairingCode) => update({ pairingCode }) },
     )
@@ -71,6 +80,7 @@ async function startServices(): Promise<void> {
       displayName: agent.publisher.current.manifest.profile.displayName,
       agentUrl: agent.url,
       pairingCode: agent.auth.pairingCode,
+      lanUrl: settings.lanAccess ? lanUrl() : undefined,
     })
     peerTimer = setInterval(refreshStatus, PEER_POLL_MS)
     await refreshStatus()
@@ -96,6 +106,15 @@ async function stopServices(): Promise<void> {
   await agent?.close().catch(() => {})
   agent = null
   await kubo.stop().catch(() => {})
+}
+
+/** This computer's address on the local network, for other devices to connect to. */
+function lanUrl(): string | undefined {
+  for (const addresses of Object.values(networkInterfaces())) {
+    const ipv4 = addresses?.find((a) => a.family === 'IPv4' && !a.internal)
+    if (ipv4) return `http://${ipv4.address}:${AGENT_PORT}`
+  }
+  return undefined
 }
 
 function friendlyError(err: unknown): string {
@@ -215,6 +234,13 @@ ipcMain.handle('set-host-follows', async (_event, enabled: boolean) => {
   await stopServices()
   await startServices()
 })
+ipcMain.handle('set-lan-access', async (_event, enabled: boolean) => {
+  settings = { ...settings, lanAccess: enabled }
+  await saveSettings(DATA_DIR, settings)
+  update({ lanAccess: enabled, lanUrl: undefined })
+  await stopServices()
+  await startServices()
+})
 ipcMain.handle('get-recovery-phrase', async () =>
   secretKeyToPhrase((await loadOrCreateIdentity(DATA_DIR)).identity.secretKey),
 )
@@ -262,6 +288,7 @@ if (!app.requestSingleInstanceLock()) {
     state.autostart = isAutostartEnabled()
     settings = await loadSettings(DATA_DIR)
     state.hostFollows = settings.hostFollows
+    state.lanAccess = settings.lanAccess
     createTray()
     // Launched at login with --hidden: stay in the tray.
     if (!process.argv.includes('--hidden')) showWindow()

@@ -2,6 +2,11 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTVWXYZ23456789'
+// Wrong pairing codes allowed per client per minute, so codes can't be guessed over the network.
+const MAX_ATTEMPTS = 5
+const ATTEMPT_WINDOW_MS = 60_000
+
+export class TooManyAttemptsError extends Error {}
 
 /**
  * Pairing: the agent shows a one-time code; the frontend trades it for a
@@ -9,6 +14,7 @@ const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTVWXYZ23456789'
  */
 export class Auth {
   private code = ''
+  private failures = new Map<string, { count: number; since: number }>()
 
   private constructor(
     private readonly file: string,
@@ -33,11 +39,20 @@ export class Auth {
     return this.code
   }
 
-  /** Returns a new token if `code` matches the current pairing code. */
-  async pair(code: string): Promise<string | null> {
+  /** Returns a new token if `code` matches the current pairing code. `client` identifies the caller for rate limiting. */
+  async pair(code: string, client = 'local', now = Date.now()): Promise<string | null> {
+    const record = this.failures.get(client)
+    if (record && now - record.since < ATTEMPT_WINDOW_MS && record.count >= MAX_ATTEMPTS) {
+      throw new TooManyAttemptsError('Too many wrong pairing codes. Wait a minute and try again.')
+    }
     const given = Buffer.from(code.trim().toUpperCase())
     const expected = Buffer.from(this.code)
-    if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null
+    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      const fresh = !record || now - record.since >= ATTEMPT_WINDOW_MS
+      this.failures.set(client, fresh ? { count: 1, since: now } : { count: record.count + 1, since: record.since })
+      return null
+    }
+    this.failures.delete(client)
     this.rotateCode()
     const token = randomBytes(32).toString('base64url')
     this.tokenHashes.add(hash(token))

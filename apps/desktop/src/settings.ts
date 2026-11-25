@@ -4,9 +4,11 @@ import { join } from 'node:path'
 /** Desktop preferences, kept next to the agent's data. */
 export interface Settings {
   hostFollows: boolean
+  /** Let phones and other devices on the local network use this app. */
+  lanAccess: boolean
 }
 
-const DEFAULTS: Settings = { hostFollows: true }
+const DEFAULTS: Settings = { hostFollows: true, lanAccess: false }
 
 export async function loadSettings(dataDir: string): Promise<Settings> {
   try {

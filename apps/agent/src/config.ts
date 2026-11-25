@@ -14,12 +14,15 @@ export interface Config {
   webRoot?: string
   /** Help keep the people you follow online by hosting their recent posts. */
   hostFollows: boolean
+  /** Accept connections from other devices on the local network (e.g. your phone), not just this computer. */
+  lanAccess: boolean
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
-    // Never bind beyond loopback: the agent holds the user's private key.
-    host: '127.0.0.1',
+    // Loopback only unless the user opts in: the agent holds their private key.
+    // Even then every API call needs a token obtained with a one-time pairing code.
+    host: env.SOCIALKEY_LAN === 'true' ? '0.0.0.0' : '127.0.0.1',
     port: Number(env.SOCIALKEY_PORT ?? 4040),
     kuboApi: env.KUBO_API ?? 'http://127.0.0.1:5001',
     kuboGateway: env.KUBO_GATEWAY ?? 'http://127.0.0.1:8080',
@@ -31,5 +34,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .filter(Boolean),
     webRoot: env.SOCIALKEY_WEB_ROOT,
     hostFollows: env.SOCIALKEY_HOST_FOLLOWS !== 'false',
+    lanAccess: env.SOCIALKEY_LAN === 'true',
   }
 }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />
     <title>SocialKey</title>
     <style>
       :root {
@@ -95,6 +95,8 @@
       label.toggle { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
       label.toggle input { margin-top: 3px; }
       .row { display: flex; gap: 8px; margin-top: 10px; }
+      .lan-pair { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 12px; text-align: center; }
+      .lan-pair img { border-radius: 12px; background: #fff; padding: 8px; }
       .phrase {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -196,6 +198,23 @@
           <span class="muted">Recommended, so your profile stays available. It starts quietly in the tray.</span>
         </span>
       </label>
+    </section>
+
+    <section class="card">
+      <h2>Use SocialKey on your phone</h2>
+      <p class="muted">Post and read from a phone or tablet on the same Wi-Fi. This computer stays the one holding your key.</p>
+      <label class="toggle" style="margin-top: 8px">
+        <input id="lan-access" type="checkbox" />
+        <span>
+          <strong>Allow devices on my network</strong><br />
+          <span class="muted">Devices still need a one-time pairing code to post.</span>
+        </span>
+      </label>
+      <div id="lan-pair" class="lan-pair" hidden>
+        <img id="lan-qr" alt="QR code to open SocialKey on your phone" width="168" height="168" />
+        <p class="muted">Scan with your phone's camera to open SocialKey there, already connected. Each code works once.</p>
+        <code id="lan-url"></code>
+      </div>
     </section>
 
     <section class="card">

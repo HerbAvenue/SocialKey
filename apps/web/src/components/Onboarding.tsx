@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Camera, Check, KeyRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { agent } from '../lib/agent'
+import { copyText } from '../lib/clipboard'
 import { didForHandle } from '../lib/dns'
 import { useMe, useOwnManifest } from '../lib/queries'
 import { profileLink } from '../lib/share'
@@ -184,7 +185,7 @@ function PeopleStep({ did, onDone }: { did: string; onDone: () => void }) {
             variant="secondary"
             className="mt-2"
             onClick={async () => {
-              await navigator.clipboard.writeText(link)
+              await copyText(link)
               toast('Link copied: send it to your friends')
             }}
           >

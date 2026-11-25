@@ -40,6 +40,7 @@ SocialKey has no database and no server. Each person runs a small app that hosts
 - Mute and block, with private lists that never leave your computer
 - Search people and posts across your network; paste an ID or `@handle` to open any profile
 - Share your profile with a link or QR code
+- Use it from your phone on the same Wi-Fi: scan a QR code in the desktop app
 - Light and dark mode, and a mobile layout with a tab bar
 
 <p align="center"><img src="docs/screenshots/mobile.png" alt="SocialKey on a phone-sized screen" width="300"></p>

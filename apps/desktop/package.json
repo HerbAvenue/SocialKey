@@ -19,10 +19,12 @@
     "@socialkey/agent": "workspace:*",
     "@socialkey/core": "workspace:*",
     "@types/node": "^26.6.5",
+    "@types/qrcode": "^1.5.6",
     "electron": "^45.0.0",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "kubo": "^0.43.1",
+    "qrcode": "^1.5.4",
     "typescript": "^7.0.2"
   }
 }

@@ -12,6 +12,9 @@ export interface AppState {
   /** Whether this app helps keep the people you follow online, and how many it hosts. */
   hostFollows: boolean
   hostedProfiles: number
+  lanAccess: boolean
+  /** Address other devices on the network use, when LAN access is on. */
+  lanUrl?: string
 }
 
 export interface SocialKeyBridge {
@@ -21,6 +24,7 @@ export interface SocialKeyBridge {
   copy(text: string): Promise<void>
   setAutostart(enabled: boolean): Promise<void>
   setHostFollows(enabled: boolean): Promise<void>
+  setLanAccess(enabled: boolean): Promise<void>
   getRecoveryPhrase(): Promise<string>
   restoreAccount(phrase: string): Promise<{ ok: boolean; message: string }>
   retry(): Promise<void>

@@ -1,3 +1,4 @@
+import QRCode from 'qrcode'
 import type { AppState, SocialKeyBridge } from '../state'
 
 declare global {
@@ -12,6 +13,8 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const statusEl = $('status')
 const autostart = $<HTMLInputElement>('autostart')
 const hostFollows = $<HTMLInputElement>('host-follows')
+const lanAccess = $<HTMLInputElement>('lan-access')
+let lastPairLink = ''
 
 function render(state: AppState): void {
   const online = state.phase === 'online'
@@ -34,6 +37,19 @@ function render(state: AppState): void {
   $('agent-url').textContent = state.agentUrl ?? '…'
   autostart.checked = state.autostart
   hostFollows.checked = state.hostFollows
+  lanAccess.checked = state.lanAccess
+  const pairLink =
+    state.lanAccess && state.lanUrl && state.pairingCode
+      ? `${state.lanUrl}/app/#/connect?code=${state.pairingCode}`
+      : ''
+  $('lan-pair').hidden = !pairLink
+  if (pairLink && pairLink !== lastPairLink) {
+    lastPairLink = pairLink
+    $('lan-url').textContent = `${state.lanUrl}/app/`
+    void QRCode.toDataURL(pairLink, { width: 336, margin: 0 }).then((src) => {
+      $<HTMLImageElement>('lan-qr').src = src
+    })
+  }
   $('hosting-status').textContent =
     state.hostFollows && state.hostedProfiles > 0
       ? `Keeping ${state.hostedProfiles} ${state.hostedProfiles === 1 ? 'person' : 'people'} you follow online.`
@@ -67,6 +83,7 @@ $('open-web').addEventListener('click', () => void api.openWeb())
 $('retry').addEventListener('click', () => void api.retry())
 autostart.addEventListener('change', () => void api.setAutostart(autostart.checked))
 hostFollows.addEventListener('change', () => void api.setHostFollows(hostFollows.checked))
+lanAccess.addEventListener('change', () => void api.setLanAccess(lanAccess.checked))
 let phrase = ''
 const phraseBox = $('phrase')
 const showPhrase = $<HTMLButtonElement>('show-phrase')

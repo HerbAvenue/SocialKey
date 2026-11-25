@@ -1,6 +1,11 @@
 import * as dagJson from '@ipld/dag-json'
+import { sha256 as nobleSha256 } from '@noble/hashes/sha2.js'
 import { CID } from 'multiformats/cid'
-import { sha256 } from 'multiformats/hashes/sha2'
+import { from } from 'multiformats/hashes/hasher'
+
+// Pure-JS sha2-256. multiformats' own hasher uses WebCrypto, which browsers hide on
+// non-secure origins, such as the agent opened over the local network from a phone.
+const sha256 = from({ name: 'sha2-256', code: 0x12, encode: (bytes) => nobleSha256(bytes) })
 
 /**
  * Deterministic DAG-JSON bytes. Keys whose value is `undefined` are dropped,
