@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>SocialKey</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fafaf9;
+        --card: #ffffff;
+        --text: #1c1917;
+        --muted: #78716c;
+        --border: #e7e5e4;
+        --accent: #1c1917;
+        --accent-text: #fafaf9;
+        --ok: #15803d;
+        --warn: #b45309;
+        --bad: #b91c1c;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0c0a09;
+          --card: #1c1917;
+          --text: #f5f5f4;
+          --muted: #a8a29e;
+          --border: #292524;
+          --accent: #f5f5f4;
+          --accent-text: #1c1917;
+          --ok: #4ade80;
+          --warn: #fbbf24;
+          --bad: #f87171;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+      header img { width: 36px; height: 36px; border-radius: 8px; }
+      h1 { font-size: 20px; margin: 0; flex: 1; }
+      h2 { font-size: 15px; margin: 0 0 8px; }
+      p { margin: 0 0 8px; }
+      .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); }
+      .online .dot { background: var(--ok); }
+      .error .dot { background: var(--bad); }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+      }
+      .muted { color: var(--muted); }
+      .id-row { display: flex; gap: 8px; align-items: center; }
+      code {
+        font: 12px ui-monospace, monospace;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 8px;
+        overflow-wrap: anywhere;
+        flex: 1;
+      }
+      button {
+        font: inherit;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 12px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button.primary {
+        width: 100%;
+        padding: 12px;
+        font-weight: 600;
+        background: var(--accent);
+        color: var(--accent-text);
+        border-color: var(--accent);
+      }
+      ol { margin: 0; padding-left: 20px; }
+      li { margin-bottom: 8px; }
+      details summary { cursor: pointer; font-weight: 600; }
+      details[open] summary { margin-bottom: 8px; }
+      .error-box { color: var(--bad); white-space: pre-wrap; font-size: 13px; }
+      label.toggle { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+      label.toggle input { margin-top: 3px; }
+      footer { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
+      section[hidden] { display: none; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="../assets/icon.png" alt="" />
+      <h1>SocialKey</h1>
+      <span id="status" class="status"><span class="dot"></span><span id="status-text">Starting…</span></span>
+    </header>
+
+    <section id="error" class="card" hidden>
+      <h2>SocialKey couldn't start</h2>
+      <p id="error-text" class="error-box"></p>
+      <button id="retry" type="button">Try again</button>
+    </section>
+
+    <section class="card">
+      <button id="open-web" class="primary" type="button" disabled>Open SocialKey</button>
+      <p class="muted" style="margin: 8px 0 0">Opens your timeline in your web browser, already signed in.</p>
+    </section>
+
+    <section class="card">
+      <h2 id="greeting">Your profile</h2>
+      <p class="muted">This is your SocialKey ID. Share it so people can find and follow you.</p>
+      <div class="id-row">
+        <code id="did">…</code>
+        <button id="copy-did" type="button" disabled>Copy</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>How it works</h2>
+      <ol>
+        <li>
+          <strong>This app is your home on the network.</strong> Your profile and posts are stored on this computer
+          and shared directly with other people. No company holds them.
+        </li>
+        <li>
+          <strong>Post and browse in your browser.</strong> Click <em>Open SocialKey</em> to write posts, edit your
+          profile, and read your timeline.
+        </li>
+        <li>
+          <strong>Follow people by their ID.</strong> Ask friends for their SocialKey ID, paste it into the search
+          box on the home page, then click <em>Follow</em> on their profile.
+        </li>
+        <li>
+          <strong>Keep it running.</strong> When this app is closed, people may not see your newest posts until
+          you're back online. Closing this window keeps SocialKey running in the tray.
+        </li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <label class="toggle">
+        <input id="autostart" type="checkbox" />
+        <span>
+          <strong>Start SocialKey when I log in</strong><br />
+          <span class="muted">Recommended, so your profile stays available. It starts quietly in the tray.</span>
+        </span>
+      </label>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>Using a different SocialKey website?</summary>
+        <p class="muted">
+          Any SocialKey website can post through this app. On that site, choose <em>Connect</em> and enter this
+          pairing code. Each code works once; a new one appears after it's used.
+        </p>
+        <div class="id-row" style="margin-bottom: 8px">
+          <code id="pairing-code">…</code>
+          <button id="copy-code" type="button" disabled>Copy</button>
+        </div>
+        <p class="muted">The site must be able to reach this app at <code id="agent-url">…</code></p>
+      </details>
+    </section>
+
+    <footer>To stop SocialKey completely, use <em>Quit SocialKey</em> in the tray menu.</footer>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

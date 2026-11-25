@@ -1,0 +1,35 @@
+appId: org.socialkey.desktop
+productName: SocialKey
+directories:
+  output: release
+files:
+  - dist/**
+  - package.json
+extraResources:
+  - from: ../web/dist
+    to: web
+  # Downloaded per target by scripts/fetch-kubo.cjs (run by the dist scripts).
+  - from: kubo-bin/${os}-${arch}/kubo
+    to: kubo
+    filter: [ipfs, ipfs.exe, LICENSE*]
+icon: assets/icon.png
+linux:
+  target: [AppImage]
+  executableName: socialkey
+  syncDesktopName: true
+  category: Network
+mac:
+  target: [dmg]
+  category: public.app-category.social-networking
+win:
+  target: [nsis]
+  executableName: SocialKey
+nsis:
+  # Per-user install: no admin prompt, installs to %LOCALAPPDATA%\Programs.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: SocialKey
+  runAfterFinish: true

@@ -1,0 +1,27 @@
+{
+  "name": "@socialkey/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.1",
+    "@fastify/static": "^10.1.7",
+    "@socialkey/core": "workspace:*",
+    "fastify": "^5.12.7",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "multiformats": "^14.0.5"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

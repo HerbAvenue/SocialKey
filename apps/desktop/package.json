@@ -1,0 +1,28 @@
+{
+  "name": "@socialkey/desktop",
+  "version": "0.1.0",
+  "productName": "SocialKey",
+  "desktopName": "socialkey.desktop",
+  "author": "SocialKey",
+  "private": true,
+  "description": "SocialKey agent for your desktop",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "pnpm --filter @socialkey/web build && node build.mjs",
+    "start": "node build.mjs && electron .",
+    "dist": "pnpm run build && node scripts/fetch-kubo.cjs && electron-builder",
+    "dist:linux": "pnpm run build && node scripts/fetch-kubo.cjs linux x64 && electron-builder --linux --x64",
+    "dist:win": "pnpm run build && node scripts/fetch-kubo.cjs win x64 && electron-builder --win --x64",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@socialkey/agent": "workspace:*",
+    "@socialkey/core": "workspace:*",
+    "@types/node": "^26.6.5",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "kubo": "^0.43.1",
+    "typescript": "^7.0.2"
+  }
+}
