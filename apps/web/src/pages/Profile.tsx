@@ -5,6 +5,7 @@ import {
   Ban,
   Copy,
   Link as LinkIcon,
+  LoaderCircle,
   Mail,
   MapPin,
   Pin,
@@ -88,6 +89,7 @@ function ProfileView({ did }: { did: string }) {
       <>
         <PageHeader title="Profile" back />
         <div className="h-36 animate-pulse bg-stone-200 dark:bg-stone-800" />
+        <SlowLoadHint />
         <PostSkeleton />
       </>
     )
@@ -277,6 +279,22 @@ function ProfileView({ did }: { did: string }) {
         </button>
       )}
     </>
+  )
+}
+
+/** After a few seconds, explains why a profile is taking a while: it's being found on the network. */
+function SlowLoadHint() {
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 4000)
+    return () => clearTimeout(timer)
+  }, [])
+  if (!slow) return null
+  return (
+    <p className="flex animate-fade-in items-center gap-2 border-b border-stone-200 px-4 py-3 text-sm text-stone-500 dark:border-stone-800">
+      <LoaderCircle className="size-4 shrink-0 animate-spin text-brand-500" />
+      Finding this profile on the IPFS network. The first visit can take up to a minute; after that it's quick.
+    </p>
   )
 }
 

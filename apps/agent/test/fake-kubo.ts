@@ -15,6 +15,8 @@ export class FakeKubo implements Kubo {
   reannounced: string[] = []
   keys: KuboKey[] = []
   failPublish = false
+  /** Simulates the real network, where an IPNS publish takes a while. */
+  publishDelayMs = 0
   /** Mimic Kubo's block/put pin=true, which pins recursively. */
   pinOnPut = false
 
@@ -75,6 +77,7 @@ export class FakeKubo implements Kubo {
   }
 
   async publish(cid: CID, keyName: string): Promise<void> {
+    if (this.publishDelayMs) await new Promise((resolve) => setTimeout(resolve, this.publishDelayMs))
     if (this.failPublish) throw new Error('publish failed')
     this.published.push({ cid, keyName })
     const name = this.keyNames.get(keyName)

@@ -14,7 +14,7 @@ import {
   readPostPage,
   verifyIpnsRecord,
 } from '@socialkey/core'
-import { GATEWAYS, MEDIA_GATEWAY, ROUTERS } from './config'
+import { GATEWAYS, MEDIA_GATEWAYS, ROUTERS } from './config'
 
 const RAW = 'application/vnd.ipld.raw'
 const IPNS_RECORD = 'application/vnd.ipfs.ipns-record'
@@ -71,7 +71,9 @@ async function resolveIpns(name: string, signal: AbortSignal): Promise<CID> {
   const urls = localGateway
     ? [`${localGateway}/routing/v1/ipns/${name}`, `${localGateway}/ipns/${name}?format=ipns-record`]
     : [
-        ...ROUTERS.map((r) => `${r}/routing/v1/ipns/${name}`),
+        // The unique query skips CDN caches: a copy cached from a non-browser request has no CORS
+        // headers, so browsers reject it. Records are signature-checked, so only freshness is at stake.
+        ...ROUTERS.map((r) => `${r}/routing/v1/ipns/${name}?nocache=${Math.random().toString(36).slice(2)}`),
         ...GATEWAYS.map((g) => `${g}/ipns/${name}?format=ipns-record`),
       ]
   return Promise.any(urls.map(async (url) => verifyIpnsRecord(name, await get(url, IPNS_RECORD, signal)).cid))
@@ -118,11 +120,11 @@ export async function loadMessage(cid: CID | string, signal?: AbortSignal): Prom
 }
 
 /**
- * A URL for a media file (UnixFS). Images are served by a gateway rather than
+ * Candidate URLs for a media file (UnixFS), best first. Images are served by a gateway rather than
  * hash-checked here: an <img> can't run code, and files can span many blocks.
  */
-export async function loadMediaUrl(cid: CID | string): Promise<string> {
-  if (localGateway) return `${localGateway}/ipfs/${cid}`
-  const v1 = CID.parse(cid.toString()).toV1()
-  return `${MEDIA_GATEWAY.protocol}//${v1}.ipfs.${MEDIA_GATEWAY.host}/`
+export function mediaUrls(cid: CID | string): string[] {
+  if (localGateway) return [`${localGateway}/ipfs/${cid}`]
+  const v1 = CID.parse(cid.toString()).toV1().toString()
+  return MEDIA_GATEWAYS.map((template) => template.replace('{cid}', v1))
 }

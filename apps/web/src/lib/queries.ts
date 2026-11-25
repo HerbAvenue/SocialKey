@@ -1,9 +1,9 @@
 import { CID, type Manifest, mergeTimeline, type TimelineEntry } from '@socialkey/core'
 import { keepPreviousData, type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { agent, getToken } from './agent'
 import { didForHandle } from './dns'
-import { loadManifest, loadMediaUrl, loadPost, loadPostPage, setLocalGateway } from './ipfs'
+import { loadManifest, loadPost, loadPostPage, mediaUrls, setLocalGateway } from './ipfs'
 import { mergeNetworks, type Network, type Person } from './social'
 
 const POSTS_PER_FOLLOW = 20
@@ -66,14 +66,19 @@ export function usePost(cid: string | undefined) {
   return useQuery({ ...postQuery(cid ?? ''), enabled: cid !== undefined })
 }
 
-export function useMediaUrl(cid: string) {
-  const query = useQuery({
-    queryKey: ['media', cid],
-    queryFn: () => loadMediaUrl(cid),
-    staleTime: Number.POSITIVE_INFINITY,
-    gcTime: Number.POSITIVE_INFINITY,
-  })
-  return query.data
+/**
+ * An image URL that moves on to the next gateway when the current one fails.
+ * Wire `onError` to the <img>; `url` is undefined once every gateway has failed.
+ */
+export function useMediaUrl(cid: string): { url: string | undefined; onError: () => void } {
+  // Read `me` so the URLs switch to the local gateway once pairing completes.
+  const gateway = useMe().data?.gateway
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mediaUrls reads the module-level gateway that pairing sets
+  const urls = useMemo(() => mediaUrls(cid), [cid, gateway])
+  const [attempt, setAttempt] = useState(0)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: start again from the best gateway when the list changes
+  useEffect(() => setAttempt(0), [urls])
+  return { url: urls[attempt], onError: () => setAttempt((a) => a + 1) }
 }
 
 export interface ModerationState {

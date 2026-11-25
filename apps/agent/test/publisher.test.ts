@@ -22,7 +22,7 @@ const identity = identityFromSecretKey(generateSecretKey())
 describe('Publisher', () => {
   let kubo: FakeKubo
   let stateFile: string
-  const make = () => new Publisher({ kubo, identity, keyName: 'socialkey', stateFile })
+  const make = () => new Publisher({ kubo, identity, keyName: 'socialkey', stateFile, publishRetryMs: 5 })
 
   beforeEach(async () => {
     kubo = new FakeKubo()
@@ -32,6 +32,7 @@ describe('Publisher', () => {
   it('publishes an empty manifest on first run', async () => {
     const publisher = make()
     await publisher.init('Alice')
+    await publisher.flush()
     const { manifest, cid } = publisher.current
     expect(manifest.profile.displayName).toBe('Alice')
     expect(kubo.published).toEqual([{ cid, keyName: 'socialkey' }])
@@ -42,6 +43,7 @@ describe('Publisher', () => {
     const publisher = make()
     await publisher.init('Alice')
     const { post, manifest } = await publisher.createPost({ text: 'first!' })
+    await publisher.flush()
     expect(readPost(kubo.block(post)).text).toBe('first!')
     expect(readManifest(kubo.block(manifest)).posts).toEqual([post])
     expect(kubo.published.at(-1)?.cid).toEqual(manifest)
@@ -60,21 +62,35 @@ describe('Publisher', () => {
   it('rejects invalid posts without publishing', async () => {
     const publisher = make()
     await publisher.init('Alice')
-    const before = kubo.published.length
+    await publisher.flush()
+    const before = publisher.current.cid
     await expect(publisher.createPost({ text: 'x'.repeat(5000) })).rejects.toThrow()
-    expect(kubo.published.length).toBe(before)
+    expect(publisher.current.cid).toEqual(before)
   })
 
-  it('keeps the previous manifest when publishing fails', async () => {
+  it('saves changes immediately and retries a failed IPNS publish', async () => {
     const publisher = make()
     await publisher.init('Alice')
-    const { cid } = publisher.current
+    await publisher.flush()
     kubo.failPublish = true
-    await expect(publisher.createPost({ text: 'lost' })).rejects.toThrow()
-    expect(publisher.current.cid).toEqual(cid)
+    const { manifest } = await publisher.createPost({ text: 'saved before it is announced' })
+    expect(publisher.current.cid).toEqual(manifest)
+    expect(publisher.published).not.toEqual(manifest)
     kubo.failPublish = false
-    await publisher.createPost({ text: 'works again' })
-    expect(publisher.current.manifest.posts).toHaveLength(1)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    await publisher.flush()
+    expect(publisher.published).toEqual(manifest)
+    expect(kubo.published.at(-1)?.cid).toEqual(manifest)
+  })
+
+  it('folds quick successive changes into few publishes, ending on the latest', async () => {
+    kubo.publishDelayMs = 30
+    const publisher = make()
+    await publisher.init('Alice')
+    for (let i = 0; i < 5; i++) await publisher.createPost({ text: `post ${i}` })
+    await publisher.flush()
+    expect(kubo.published.at(-1)?.cid).toEqual(publisher.current.cid)
+    expect(kubo.published.length).toBeLessThan(6)
   })
 
   it('applies concurrent changes in order', async () => {

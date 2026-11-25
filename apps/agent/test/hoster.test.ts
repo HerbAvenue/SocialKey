@@ -25,6 +25,7 @@ describe('Hoster', () => {
       stateFile: join(dir, 'friend.dagjson'),
     })
     await friendPublisher.init('Friend')
+    await friendPublisher.flush()
     follows = [friend.did]
   })
 
@@ -33,6 +34,7 @@ describe('Hoster', () => {
   it("pins a followed profile's manifest, posts and media, and re-announces its record", async () => {
     const image = await kubo.addFile(new Uint8Array([1, 2, 3]))
     const { post } = await friendPublisher.createPost({ text: 'hi', media: [image.toString()] })
+    await friendPublisher.flush()
     const hoster = makeHoster()
     await hoster.runOnce()
 
@@ -48,6 +50,7 @@ describe('Hoster', () => {
     await hoster.runOnce()
     const first = friendPublisher.current.cid
     await friendPublisher.createPost({ text: 'new' })
+    await friendPublisher.flush()
     await hoster.runOnce()
     expect(kubo.pins.has(first.toString())).toBe(false)
     expect(kubo.pins.has(friendPublisher.current.cid.toString())).toBe(true)
@@ -88,6 +91,7 @@ describe('Hoster', () => {
   it("never unpins content it didn't pin itself", async () => {
     kubo.pinOnPut = true
     await friendPublisher.createPost({ text: 'already pinned by its owner' })
+    await friendPublisher.flush()
     const hoster = makeHoster()
     await hoster.runOnce()
     follows = []

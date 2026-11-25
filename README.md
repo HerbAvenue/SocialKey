@@ -125,7 +125,7 @@ apps/desktop    Electron app bundling Kubo, the agent and the web app, with a tr
 SocialKey is early software. Things to know:
 
 - **No central index**, so search, notifications and follower counts only cover people within two follows of you.
-- **Visitors without the app** read profiles through public IPFS gateways. That works best while the profile's owner, or one of their followers, is online.
+- **Visitors without the app** read profiles through public IPFS gateways. In a test on the live network, a profile hosted on a home computer behind a router loaded for a visitor in about 30 seconds; after that, it's cached and quick. It works while the profile's owner, or one of their followers, is online.
 - **Messages from strangers** only show up once they're within two follows of you (or you've messaged them first).
 - **Not yet built:** real-time updates, a mobile app, code-signed installers and auto-update.
 - **Deleting a post** removes it from your profile and your node, but people who already fetched it may still have a copy, as on any network.

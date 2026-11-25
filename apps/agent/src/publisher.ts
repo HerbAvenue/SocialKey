@@ -60,7 +60,12 @@ interface Deps {
   /** Where the latest signed manifest's DAG-JSON bytes are kept. */
   stateFile: string
   now?: () => Date
+  log?: (message: string) => void
+  /** How long to wait before retrying a failed IPNS publish. */
+  publishRetryMs?: number
 }
+
+const PUBLISH_RETRY_MS = 30_000
 
 /**
  * Owns the user's manifest. Every change is applied one at a time:
@@ -70,6 +75,10 @@ export class Publisher {
   private manifest!: Manifest
   private manifestCid!: CID
   private queue: Promise<unknown> = Promise.resolve()
+  private publishing: Promise<void> | undefined
+  private publishAgain = false
+  private publishedCid: CID | undefined
+  private closed = false
   private readonly now: () => Date
 
   constructor(private readonly deps: Deps) {
@@ -99,7 +108,7 @@ export class Publisher {
     this.manifestCid = await cidOf(bytes)
     // Re-store and republish in case Kubo's repo was reset since the last run.
     await this.deps.kubo.putBlock(bytes)
-    await this.deps.kubo.publish(this.manifestCid, this.deps.keyName)
+    this.schedulePublish()
   }
 
   private async recoverFromNetwork(): Promise<boolean> {
@@ -312,13 +321,58 @@ export class Publisher {
     )
     const bytes = encode(manifest)
     const cid = await this.store(bytes)
-    await this.deps.kubo.publish(cid, this.deps.keyName)
     const tmp = `${this.deps.stateFile}.tmp`
     await writeFile(tmp, bytes)
     await rename(tmp, this.deps.stateFile)
     this.manifest = manifest
     this.manifestCid = cid
+    this.schedulePublish()
     return cid
+  }
+
+  /**
+   * Announces the latest manifest over IPNS in the background. A DHT publish
+   * takes tens of seconds on the real network, so changes are saved and shown
+   * immediately and the announcement catches up. Changes made meanwhile are
+   * folded into one follow-up publish; failures retry.
+   */
+  private schedulePublish(delayMs = 0): void {
+    if (this.publishing) {
+      this.publishAgain = true
+      return
+    }
+    this.publishing = (async () => {
+      if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs))
+      const cid = this.manifestCid
+      try {
+        await this.deps.kubo.publish(cid, this.deps.keyName)
+        this.publishedCid = cid
+      } catch (err) {
+        this.deps.log?.(`IPNS publish failed, retrying: ${err instanceof Error ? err.message : err}`)
+        this.publishAgain = true
+        delayMs = this.deps.publishRetryMs ?? PUBLISH_RETRY_MS
+      }
+    })().finally(() => {
+      this.publishing = undefined
+      const again = this.publishAgain || !this.manifestCid.equals(this.publishedCid ?? this.manifestCid)
+      this.publishAgain = false
+      if (again && !this.closed) this.schedulePublish(this.publishedCid?.equals(this.manifestCid) ? 0 : delayMs)
+    })
+  }
+
+  /** Waits for any IPNS publish in progress (and the follow-ups it scheduled). */
+  async flush(): Promise<void> {
+    while (this.publishing) await this.publishing
+  }
+
+  /** Stops scheduling publishes. */
+  close(): void {
+    this.closed = true
+  }
+
+  /** The manifest CID most recently announced over IPNS, if any. */
+  get published(): CID | undefined {
+    return this.publishedCid
   }
 
   /** Stores DAG-JSON bytes and checks Kubo derived the same CID we did. */

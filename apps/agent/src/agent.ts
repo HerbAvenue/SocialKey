@@ -39,6 +39,7 @@ export async function startAgent(
     identity,
     keyName: config.keyName,
     stateFile: join(config.dataDir, 'manifest.dagjson'),
+    log: logger ? (message) => console.warn(message) : undefined,
   })
   // An existing key without saved state means a restore or reinstall: look for the profile online first.
   await publisher.init('Anonymous', { recover: !created })
@@ -67,6 +68,7 @@ export async function startAgent(
     url: `http://${config.host}:${config.port}`,
     close: async () => {
       hoster?.stop()
+      publisher.close()
       await app.close()
     },
   }

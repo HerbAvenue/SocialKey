@@ -50,6 +50,6 @@ export function Avatar({
 }
 
 function AvatarImage({ cid }: { cid: string }) {
-  const url = useMediaUrl(cid)
-  return url ? <img src={url} alt="" className="size-full object-cover" /> : null
+  const { url, onError } = useMediaUrl(cid)
+  return url ? <img src={url} alt="" onError={onError} className="size-full object-cover" /> : null
 }
