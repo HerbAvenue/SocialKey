@@ -40,6 +40,9 @@ jobs:
       - run: pnpm --filter @socialkey/desktop ${{ matrix.script }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          # Share links from the app point at the public website, not the local copy.
+          VITE_PUBLIC_URL: https://herbavenue.github.io/SocialKey/
+          VITE_DOWNLOAD_URL: https://github.com/HerbAvenue/SocialKey/releases/latest
       - uses: actions/upload-artifact@v4
         with:
           name: socialkey-${{ matrix.os }}

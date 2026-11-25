@@ -57,7 +57,7 @@ export function Landing() {
             I have the app
           </Link>
         </div>
-        <p className="mt-3 text-sm text-stone-500">Free for Windows and Linux.</p>
+        <p className="mt-3 text-sm text-stone-500">Free for Windows, macOS and Linux.</p>
       </section>
 
       <section className="grid gap-px bg-stone-200 sm:grid-cols-2 dark:bg-stone-800">

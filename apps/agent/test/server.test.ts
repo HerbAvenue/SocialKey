@@ -105,6 +105,21 @@ describe('agent HTTP API', () => {
     )
   })
 
+  it('answers private network preflights from allowed origins only', async () => {
+    const preflight = (origin: string) =>
+      app.inject({
+        method: 'OPTIONS',
+        url: '/me',
+        headers: {
+          origin,
+          'access-control-request-method': 'GET',
+          'access-control-request-private-network': 'true',
+        },
+      })
+    expect((await preflight('http://localhost:5173')).headers['access-control-allow-private-network']).toBe('true')
+    expect((await preflight('https://evil.example')).headers['access-control-allow-private-network']).toBeUndefined()
+  })
+
   it('serves the web app without pairing', async () => {
     expect((await app.inject({ method: 'GET', url: '/' })).headers.location).toBe('/app/')
     const res = await app.inject({ method: 'GET', url: '/app/' })

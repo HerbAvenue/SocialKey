@@ -1,6 +1,9 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+/** Origin of the public SocialKey website. */
+export const PUBLIC_SITE_ORIGIN = 'https://herbavenue.github.io'
+
 export interface Config {
   host: string
   port: number
@@ -30,7 +33,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     kuboGateway: env.KUBO_GATEWAY ?? 'http://127.0.0.1:8080',
     dataDir: env.SOCIALKEY_DATA_DIR ?? join(homedir(), '.socialkey'),
     keyName: env.SOCIALKEY_KEY_NAME ?? 'socialkey',
-    allowedOrigins: (env.SOCIALKEY_ORIGINS ?? 'http://localhost:5173,http://127.0.0.1:5173')
+    // The Vite dev server and the public website (GitHub Pages), so either can pair with this agent.
+    allowedOrigins: (env.SOCIALKEY_ORIGINS ?? `http://localhost:5173,http://127.0.0.1:5173,${PUBLIC_SITE_ORIGIN}`)
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean),

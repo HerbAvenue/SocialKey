@@ -73,9 +73,18 @@ export async function buildServer({
 }: Deps): Promise<FastifyInstance> {
   const app = Fastify({ logger })
 
+  // The agent's own origins are always allowed, for the web app it serves at /app/.
+  const origins = [...config.allowedOrigins, `http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`]
+  // A public website (e.g. GitHub Pages) calling this loopback agent is a "private network" request;
+  // Chrome's preflight for it asks for this extra header.
+  app.addHook('onRequest', async (req, reply) => {
+    const origin = req.headers.origin
+    if (req.method === 'OPTIONS' && req.headers['access-control-request-private-network'] === 'true') {
+      if (origin && origins.includes(origin)) reply.header('access-control-allow-private-network', 'true')
+    }
+  })
   await app.register(cors, {
-    // The agent's own origins are always allowed, for the web app it serves at /app/.
-    origin: [...config.allowedOrigins, `http://127.0.0.1:${config.port}`, `http://localhost:${config.port}`],
+    origin: origins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Authorization', 'Content-Type'],
   })

@@ -16,7 +16,8 @@ Your profile lives on your own computer, signed with a key only you hold, and is
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![IPFS](https://img.shields.io/badge/built%20on-IPFS%20%2B%20IPNS-65c2cb?logo=ipfs&logoColor=white)
 
-[**Download**](https://github.com/HerbAvenue/SocialKey/releases) ·
+[**Try it in your browser**](https://herbavenue.github.io/SocialKey/) ·
+[**Download**](https://github.com/HerbAvenue/SocialKey/releases/latest) ·
 [Features](#features) ·
 [How it works](#how-it-works) ·
 [Security](#security-model) ·
@@ -131,7 +132,7 @@ You don't need to know what IPFS is. The SocialKey desktop app bundles everythin
 
 ### Just browsing
 
-Anyone can open the SocialKey website to read public profiles and posts, with nothing installed. Content is fetched from public IPFS gateways and verified in the browser. Posting needs the app, because that's where your key lives.
+Anyone can open the [SocialKey website](https://herbavenue.github.io/SocialKey/) to read public profiles and posts, with nothing installed. Content is fetched from public IPFS gateways and verified in the browser. Posting needs the app, because that's where your key lives.
 
 ## How it works
 
@@ -228,6 +229,7 @@ SOCIALKEY_DATA_DIR=/tmp/demo-user pnpm --filter @socialkey/agent dev
 <br>
 
 - **Installers:** push a tag like `v0.6.0`. The Release workflow builds the Windows, Linux and macOS (Apple Silicon and Intel) apps, each on its own OS, and attaches them to a draft GitHub release. Run the workflow by hand to build them without making a release.
+- **The website:** every push to `master` publishes the web app to [GitHub Pages](https://herbavenue.github.io/SocialKey/) (`.github/workflows/pages.yml`). Desktop agents accept that origin by default, so visitors can connect it to their own app.
 - **The website, on IPFS:** build with `VITE_PUBLIC_URL` (where the site will live, used in share links) and `VITE_DOWNLOAD_URL` (your releases page), then run `pnpm --filter @socialkey/web publish:ipfs`. It prints the CID, gateway links and the DNSLink record for serving it from your own domain.
 
 </details>
