@@ -9,14 +9,15 @@
  */
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { deflateSync, crc32 } from 'node:zlib'
+import { crc32, deflateSync } from 'node:zlib'
 import type { CID } from '@socialkey/core'
 import { ensureKuboKey, loadOrCreateIdentity } from '../src/keystore'
 import { HttpKubo } from '../src/kubo'
 import { Publisher } from '../src/publisher'
 
 const args = new Map<string, string>()
-for (let i = 2; i < process.argv.length; i += 2) args.set(process.argv[i]?.replace(/^--/, '') ?? '', process.argv[i + 1] ?? '')
+for (let i = 2; i < process.argv.length; i += 2)
+  args.set(process.argv[i]?.replace(/^--/, '') ?? '', process.argv[i + 1] ?? '')
 const seedDir = args.get('dir')
 const mainDir = args.get('main')
 if (!seedDir || !mainDir) {
@@ -35,15 +36,69 @@ interface Persona {
 }
 
 const PEOPLE: Persona[] = [
-  { id: 'main', name: 'Sam Rivera', bio: 'Trying out SocialKey. Coffee, code and long walks.', location: 'Lisbon', hue: 265 },
-  { id: 'ada', name: 'Ada Okafor', bio: 'Open-source maintainer. Building tools that respect people. #rustlang #ipfs', location: 'Lagos', website: 'https://example.com/ada', hue: 200 },
-  { id: 'ben', name: 'Ben Larsen', bio: 'Landscape photographer chasing light across Scandinavia 📷', location: 'Bergen', hue: 30 },
-  { id: 'chloe', name: 'Chloe Martin', bio: 'Researching peer-to-peer networks. Opinions are content-addressed.', location: 'Paris', hue: 330 },
-  { id: 'dev', name: 'Dev Patel', bio: 'Indie game dev. Currently making a cozy farming game about mushrooms 🍄', hue: 140 },
-  { id: 'elena', name: 'Elena Costa', bio: 'Tech journalist covering privacy, the open web and the people building it.', location: 'Milan', hue: 10 },
-  { id: 'farid', name: 'Farid Haddad', bio: 'Urbanist and daily cyclist. Cities are for people. 🚲', location: 'Montréal', hue: 90 },
-  { id: 'grace', name: 'Grace Kim', bio: 'Sourdough evangelist. I will tell you about my starter.', location: 'Seoul', hue: 45 },
-  { id: 'hiro', name: 'Hiro Tanaka', bio: 'Ambient musician. New album out soon on every platform you own.', location: 'Osaka', hue: 290 },
+  {
+    id: 'main',
+    name: 'Sam Rivera',
+    bio: 'Trying out SocialKey. Coffee, code and long walks.',
+    location: 'Lisbon',
+    hue: 265,
+  },
+  {
+    id: 'ada',
+    name: 'Ada Okafor',
+    bio: 'Open-source maintainer. Building tools that respect people. #rustlang #ipfs',
+    location: 'Lagos',
+    website: 'https://example.com/ada',
+    hue: 200,
+  },
+  {
+    id: 'ben',
+    name: 'Ben Larsen',
+    bio: 'Landscape photographer chasing light across Scandinavia 📷',
+    location: 'Bergen',
+    hue: 30,
+  },
+  {
+    id: 'chloe',
+    name: 'Chloe Martin',
+    bio: 'Researching peer-to-peer networks. Opinions are content-addressed.',
+    location: 'Paris',
+    hue: 330,
+  },
+  {
+    id: 'dev',
+    name: 'Dev Patel',
+    bio: 'Indie game dev. Currently making a cozy farming game about mushrooms 🍄',
+    hue: 140,
+  },
+  {
+    id: 'elena',
+    name: 'Elena Costa',
+    bio: 'Tech journalist covering privacy, the open web and the people building it.',
+    location: 'Milan',
+    hue: 10,
+  },
+  {
+    id: 'farid',
+    name: 'Farid Haddad',
+    bio: 'Urbanist and daily cyclist. Cities are for people. 🚲',
+    location: 'Montréal',
+    hue: 90,
+  },
+  {
+    id: 'grace',
+    name: 'Grace Kim',
+    bio: 'Sourdough evangelist. I will tell you about my starter.',
+    location: 'Seoul',
+    hue: 45,
+  },
+  {
+    id: 'hiro',
+    name: 'Hiro Tanaka',
+    bio: 'Ambient musician. New album out soon on every platform you own.',
+    location: 'Osaka',
+    hue: 290,
+  },
 ]
 
 const FOLLOWS: Record<string, string[]> = {
@@ -59,45 +114,143 @@ const FOLLOWS: Record<string, string[]> = {
 }
 
 type Action =
-  | { at: number; by: string; post: string; text: string; ref?: string; replyTo?: string; quoteOf?: string; mention?: string[]; images?: number }
+  | {
+      at: number
+      by: string
+      post: string
+      text: string
+      ref?: string
+      replyTo?: string
+      quoteOf?: string
+      mention?: string[]
+      images?: number
+    }
   | { at: number; by: string; like: string }
   | { at: number; by: string; repost: string }
 
 // `at` is minutes before now. Refs name posts so later actions can point at them.
 const ACTIONS: Action[] = [
-  { at: 4320, by: 'chloe', post: 'c1', text: 'Content addressing changes how you think about links. A CID never rots: it either resolves to exactly that content, or nothing. #ipfs' },
-  { at: 4000, by: 'ada', post: 'a1', text: 'Shipped v2.0 of my CLI today! Thanks to the 40 contributors who made it happen. Open source is people. #opensource' },
-  { at: 3900, by: 'dev', post: 'd1', text: 'Mushroom farming game devlog #12: spores now drift with the wind. Watching them spread is weirdly calming. #gamedev', images: 1 },
-  { at: 3600, by: 'ben', post: 'b1', text: 'First light over the fjord this morning. Worth the 4am alarm. #photography', images: 2 },
-  { at: 3500, by: 'grace', post: 'g1', text: 'Day 412 of my sourdough starter. Her name is Doughlores and she is thriving. #baking' },
+  {
+    at: 4320,
+    by: 'chloe',
+    post: 'c1',
+    text: 'Content addressing changes how you think about links. A CID never rots: it either resolves to exactly that content, or nothing. #ipfs',
+  },
+  {
+    at: 4000,
+    by: 'ada',
+    post: 'a1',
+    text: 'Shipped v2.0 of my CLI today! Thanks to the 40 contributors who made it happen. Open source is people. #opensource',
+  },
+  {
+    at: 3900,
+    by: 'dev',
+    post: 'd1',
+    text: 'Mushroom farming game devlog #12: spores now drift with the wind. Watching them spread is weirdly calming. #gamedev',
+    images: 1,
+  },
+  {
+    at: 3600,
+    by: 'ben',
+    post: 'b1',
+    text: 'First light over the fjord this morning. Worth the 4am alarm. #photography',
+    images: 2,
+  },
+  {
+    at: 3500,
+    by: 'grace',
+    post: 'g1',
+    text: 'Day 412 of my sourdough starter. Her name is Doughlores and she is thriving. #baking',
+  },
   { at: 3400, by: 'ben', like: 'g1' },
-  { at: 3000, by: 'elena', post: 'e1', text: "New piece: what happens to your posts when a social network shuts down? Spoiler: usually they vanish. Unless you host them yourself. #decentralization" },
+  {
+    at: 3000,
+    by: 'elena',
+    post: 'e1',
+    text: 'New piece: what happens to your posts when a social network shuts down? Spoiler: usually they vanish. Unless you host them yourself. #decentralization',
+  },
   { at: 2950, by: 'chloe', repost: 'e1' },
   { at: 2900, by: 'ada', post: 'a2', text: 'Great read, and exactly why I moved my profile here.', replyTo: 'e1' },
-  { at: 2800, by: 'farid', post: 'f1', text: 'Protected bike lanes on my street are finally done. Counted 300 cyclists in an hour this morning! #cycling #urbanism', images: 1 },
-  { at: 2600, by: 'hiro', post: 'h1', text: 'Recording rain on a tin roof for the new album. Nature is the best synth. #music' },
-  { at: 2400, by: 'main', post: 'm1', text: 'Hello SocialKey! My first post from a profile that lives on my own laptop. Feels good. #introductions' },
-  { at: 2350, by: 'ada', post: 'a3', text: 'Welcome @SamRivera! Glad to have you here.', replyTo: 'm1', mention: ['main'] },
+  {
+    at: 2800,
+    by: 'farid',
+    post: 'f1',
+    text: 'Protected bike lanes on my street are finally done. Counted 300 cyclists in an hour this morning! #cycling #urbanism',
+    images: 1,
+  },
+  {
+    at: 2600,
+    by: 'hiro',
+    post: 'h1',
+    text: 'Recording rain on a tin roof for the new album. Nature is the best synth. #music',
+  },
+  {
+    at: 2400,
+    by: 'main',
+    post: 'm1',
+    text: 'Hello SocialKey! My first post from a profile that lives on my own laptop. Feels good. #introductions',
+  },
+  {
+    at: 2350,
+    by: 'ada',
+    post: 'a3',
+    text: 'Welcome @SamRivera! Glad to have you here.',
+    replyTo: 'm1',
+    mention: ['main'],
+  },
   { at: 2340, by: 'ben', like: 'm1' },
   { at: 2330, by: 'ada', like: 'm1' },
-  { at: 2200, by: 'chloe', post: 'c2', text: 'Signed posts + IPNS = you can verify everything you read came from who it says. No trust in the server required, because there is no server.', quoteOf: 'c1' },
+  {
+    at: 2200,
+    by: 'chloe',
+    post: 'c2',
+    text: 'Signed posts + IPNS = you can verify everything you read came from who it says. No trust in the server required, because there is no server.',
+    quoteOf: 'c1',
+  },
   { at: 2000, by: 'main', like: 'b1' },
-  { at: 1900, by: 'main', post: 'm2', text: "Ben's fjord photos are unreal. Following for more of those.", quoteOf: 'b1' },
+  {
+    at: 1900,
+    by: 'main',
+    post: 'm2',
+    text: "Ben's fjord photos are unreal. Following for more of those.",
+    quoteOf: 'b1',
+  },
   { at: 1850, by: 'ben', post: 'b2', text: 'Thank you! More coming from the Lofoten trip next week.', replyTo: 'm2' },
   { at: 1500, by: 'dev', post: 'd2', text: 'Hot take: every game should have a photo mode. #gamedev' },
   { at: 1400, by: 'hiro', like: 'd2' },
-  { at: 1200, by: 'elena', post: 'e2', text: 'Interviewing @ChloeMartin next week about peer-to-peer networks. What should I ask her?', mention: ['chloe'] },
+  {
+    at: 1200,
+    by: 'elena',
+    post: 'e2',
+    text: 'Interviewing @ChloeMartin next week about peer-to-peer networks. What should I ask her?',
+    mention: ['chloe'],
+  },
   { at: 1100, by: 'chloe', post: 'c3', text: "Looking forward to it! I'll bring diagrams.", replyTo: 'e2' },
   { at: 900, by: 'grace', post: 'g2', text: 'Made a rye loaf with Doughlores. The crumb!! #baking', images: 1 },
   { at: 800, by: 'farid', like: 'g2' },
-  { at: 600, by: 'ada', post: 'a4', text: 'Reminder that you can use your own domain as your handle here. One DNS record and you are @yourname.com. #ipfs' },
+  {
+    at: 600,
+    by: 'ada',
+    post: 'a4',
+    text: 'Reminder that you can use your own domain as your handle here. One DNS record and you are @yourname.com. #ipfs',
+  },
   { at: 500, by: 'chloe', like: 'a4' },
   { at: 400, by: 'ben', repost: 'm1' },
   { at: 300, by: 'hiro', post: 'h2', text: 'Album artwork is done. Counting down to release day. #music', images: 1 },
-  { at: 200, by: 'main', post: 'm3', text: 'Two days in and my feed is just people I chose to follow, in order. I forgot how nice that is.' },
+  {
+    at: 200,
+    by: 'main',
+    post: 'm3',
+    text: 'Two days in and my feed is just people I chose to follow, in order. I forgot how nice that is.',
+  },
   { at: 120, by: 'chloe', like: 'm3' },
   { at: 90, by: 'ada', post: 'a5', text: 'Same! No algorithm, no ads. Just posts.', replyTo: 'm3' },
-  { at: 30, by: 'dev', post: 'd3', text: 'Playtest build is up for friends. DM me... oh wait, we do not have DMs yet. Reply here! #gamedev' },
+  {
+    at: 30,
+    by: 'dev',
+    post: 'd3',
+    text: 'Playtest build is up for friends. DM me... oh wait, we do not have DMs yet. Reply here! #gamedev',
+  },
 ]
 
 /** A small gradient "photo" PNG, so demo posts have images without bundling any. */
@@ -114,7 +267,8 @@ function gradientPng(width: number, height: number, hue: number, seed: number): 
     for (let x = 0; x < width; x++) {
       const t = y / height
       const hill = Math.sin(x / (width / (3 + seed)) + seed) * 0.08 + 0.62
-      const [r, g, b] = t > hill ? rgb((hue + 40) % 360, 0.35, 0.25 + (1 - t) * 0.2) : rgb((hue + t * 60) % 360, 0.65, 0.45 + t * 0.3)
+      const [r, g, b] =
+        t > hill ? rgb((hue + 40) % 360, 0.35, 0.25 + (1 - t) * 0.2) : rgb((hue + t * 60) % 360, 0.65, 0.45 + t * 0.3)
       raw.set([r, g, b], y * (width * 3 + 1) + 1 + x * 3)
     }
   }
@@ -146,7 +300,13 @@ for (const persona of PEOPLE) {
   const { identity } = await loadOrCreateIdentity(dataDir)
   const keyName = persona.id === 'main' ? (process.env.SOCIALKEY_KEY_NAME ?? 'socialkey') : `seed-${persona.id}`
   await ensureKuboKey(kubo, keyName, identity)
-  const publisher = new Publisher({ kubo, identity, keyName, stateFile: join(dataDir, 'manifest.dagjson'), now: () => new Date(clock) })
+  const publisher = new Publisher({
+    kubo,
+    identity,
+    keyName,
+    stateFile: join(dataDir, 'manifest.dagjson'),
+    now: () => new Date(clock),
+  })
   await publisher.init(persona.name)
   people.set(persona.id, { persona, publisher, did: identity.did })
   console.log(`${persona.name.padEnd(14)} ${identity.did}`)
