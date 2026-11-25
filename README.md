@@ -23,7 +23,7 @@ SocialKey has no database and no server. Each person runs a small app that hosts
 - **Private messages, no server.** Direct messages are end-to-end encrypted and stored in the sender's own profile, labelled so only the recipient can even tell they're addressed to them.
 - **Your feed, in order.** Posts from the people you follow, newest first. No algorithm, no ads, no tracking.
 - **Your domain, your name.** Prove you own a domain with one DNS record and use it as your handle, like `@alice.com`.
-- **Portable identity.** Your identity is a key (`did:key`), not a username on someone's server.
+- **Portable identity.** Your identity is a key (`did:key`), not a username on someone's server. Back it up as a 24-word recovery phrase and restore it on any computer: your profile comes back from the network.
 
 ## Features
 

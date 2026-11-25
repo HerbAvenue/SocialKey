@@ -10,6 +10,8 @@ const bridge: SocialKeyBridge = {
   copy: (text) => ipcRenderer.invoke('copy', text),
   setAutostart: (enabled) => ipcRenderer.invoke('set-autostart', enabled),
   setHostFollows: (enabled) => ipcRenderer.invoke('set-host-follows', enabled),
+  getRecoveryPhrase: () => ipcRenderer.invoke('get-recovery-phrase'),
+  restoreAccount: (phrase) => ipcRenderer.invoke('restore-account', phrase),
   retry: () => ipcRenderer.invoke('retry'),
 }
 

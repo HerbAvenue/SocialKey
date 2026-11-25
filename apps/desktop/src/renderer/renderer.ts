@@ -67,5 +67,43 @@ $('open-web').addEventListener('click', () => void api.openWeb())
 $('retry').addEventListener('click', () => void api.retry())
 autostart.addEventListener('change', () => void api.setAutostart(autostart.checked))
 hostFollows.addEventListener('change', () => void api.setHostFollows(hostFollows.checked))
+let phrase = ''
+const phraseBox = $('phrase')
+const showPhrase = $<HTMLButtonElement>('show-phrase')
+showPhrase.addEventListener('click', async () => {
+  if (!phraseBox.hidden) {
+    phraseBox.hidden = true
+    phraseBox.replaceChildren()
+    $('copy-phrase').hidden = true
+    showPhrase.textContent = 'Show recovery phrase'
+    return
+  }
+  phrase = await api.getRecoveryPhrase()
+  phraseBox.replaceChildren(
+    ...phrase.split(' ').map((word, i) => {
+      const span = document.createElement('span')
+      span.dataset.n = String(i + 1)
+      span.textContent = word
+      return span
+    }),
+  )
+  phraseBox.hidden = false
+  $('copy-phrase').hidden = false
+  showPhrase.textContent = 'Hide'
+})
+copyButton('copy-phrase', () => phrase)
+
+$('restore').addEventListener('click', async () => {
+  const input = $<HTMLTextAreaElement>('restore-phrase')
+  const result = $('restore-result')
+  if (!input.value.trim()) return
+  if (!confirm('Replace the account on this computer with the one from this recovery phrase?')) return
+  const { ok, message } = await api.restoreAccount(input.value)
+  result.hidden = false
+  result.textContent = message
+  result.style.color = ok ? '' : 'var(--bad)'
+  if (ok) input.value = ''
+})
+
 copyButton('copy-did', () => current?.did)
 copyButton('copy-code', () => current?.pairingCode)

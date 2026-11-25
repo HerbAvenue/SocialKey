@@ -94,6 +94,32 @@
       .error-box { color: var(--bad); white-space: pre-wrap; font-size: 13px; }
       label.toggle { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
       label.toggle input { margin-top: 3px; }
+      .row { display: flex; gap: 8px; margin-top: 10px; }
+      .phrase {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        margin-top: 10px;
+        font: 13px ui-monospace, monospace;
+      }
+      .phrase span {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 6px;
+      }
+      .phrase span::before { content: attr(data-n) ". "; color: var(--muted); }
+      textarea {
+        width: 100%;
+        margin-top: 8px;
+        font: 13px ui-monospace, monospace;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px;
+        resize: vertical;
+      }
       footer { font-size: 12px; color: var(--muted); text-align: center; margin-top: 8px; }
       section[hidden] { display: none; }
     </style>
@@ -170,6 +196,28 @@
           <span class="muted">Recommended, so your profile stays available. It starts quietly in the tray.</span>
         </span>
       </label>
+    </section>
+
+    <section class="card">
+      <h2>Back up your account</h2>
+      <p class="muted">
+        Your account is a secret key stored on this computer. Its recovery phrase is the only way to get your account
+        back if this computer is lost. Write it down and keep it somewhere safe and private.
+      </p>
+      <div id="phrase" class="phrase" hidden></div>
+      <div class="row">
+        <button id="show-phrase" type="button">Show recovery phrase</button>
+        <button id="copy-phrase" type="button" hidden>Copy</button>
+      </div>
+      <details style="margin-top: 12px">
+        <summary>Restore an account from a recovery phrase</summary>
+        <p class="muted">This replaces the account on this computer. The current account's files are archived, not deleted.</p>
+        <textarea id="restore-phrase" rows="3" placeholder="24 words, separated by spaces" spellcheck="false" autocomplete="off"></textarea>
+        <div class="row">
+          <button id="restore" type="button">Restore account</button>
+        </div>
+        <p id="restore-result" class="muted" hidden></p>
+      </details>
     </section>
 
     <section class="card">

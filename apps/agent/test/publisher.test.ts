@@ -190,4 +190,25 @@ describe('Publisher', () => {
     await publisher.init('Alice')
     expect(() => publisher.sendMessage(identity.did, '  ')).toThrow(RangeError)
   })
+
+  it('recovers an existing profile from the network instead of starting blank', async () => {
+    kubo.keyNames.set('socialkey', identity.ipnsName)
+    const original = make()
+    await original.init('Alice')
+    await original.updateProfile({ bio: 'my real profile' })
+    const { post } = await original.createPost({ text: 'still here' })
+
+    // Same key, but the local state is gone (new computer, reinstall, restore).
+    stateFile = join(await mkdtemp(join(tmpdir(), 'socialkey-')), 'manifest.dagjson')
+    const restored = make()
+    await restored.init('Anonymous', { recover: true })
+    expect(restored.current.manifest.profile.bio).toBe('my real profile')
+    expect(restored.current.manifest.posts).toEqual([post])
+  })
+
+  it('starts blank when there is nothing to recover', async () => {
+    const publisher = make()
+    await publisher.init('Fresh', { recover: true })
+    expect(publisher.current.manifest.profile.displayName).toBe('Fresh')
+  })
 })

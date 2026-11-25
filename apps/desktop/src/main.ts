@@ -1,7 +1,15 @@
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { loadConfig, type RunningAgent, startAgent } from '@socialkey/agent'
+import {
+  HttpKubo,
+  loadConfig,
+  loadOrCreateIdentity,
+  type RunningAgent,
+  replaceIdentity,
+  startAgent,
+} from '@socialkey/agent'
+import { identityFromSecretKey, phraseToSecretKey, secretKeyToPhrase } from '@socialkey/core'
 import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { isAutostartEnabled, setAutostart } from './autostart'
 import { KuboDaemon } from './kubo-daemon'
@@ -206,6 +214,28 @@ ipcMain.handle('set-host-follows', async (_event, enabled: boolean) => {
   // The agent reads this at startup, so restart it.
   await stopServices()
   await startServices()
+})
+ipcMain.handle('get-recovery-phrase', async () =>
+  secretKeyToPhrase((await loadOrCreateIdentity(DATA_DIR)).identity.secretKey),
+)
+ipcMain.handle('restore-account', async (_event, phrase: string): Promise<{ ok: boolean; message: string }> => {
+  let secretKey: Uint8Array
+  try {
+    secretKey = phraseToSecretKey(phrase)
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) }
+  }
+  if (identityFromSecretKey(secretKey).did === state.did)
+    return { ok: false, message: 'That phrase is for the account already on this computer.' }
+  update({ phase: 'starting', did: undefined, displayName: undefined })
+  // Kubo must be running to drop its copy of the old key, so stop only the agent first.
+  clearInterval(peerTimer)
+  await agent?.close().catch(() => {})
+  agent = null
+  const archive = await replaceIdentity(DATA_DIR, secretKey, new HttpKubo(kubo.apiUrl), loadConfig({}).keyName)
+  await stopServices()
+  await startServices()
+  return { ok: true, message: `Account restored. The previous account's files were kept in ${archive}.` }
 })
 ipcMain.handle('retry', async () => {
   await stopServices()

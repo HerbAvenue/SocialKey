@@ -19,6 +19,7 @@ export interface Kubo {
   listKeys(): Promise<KuboKey[]>
   /** Imports a libp2p protobuf-encoded private key. */
   importKey(name: string, protobufKey: Uint8Array): Promise<void>
+  removeKey(name: string): Promise<void>
   /**
    * Pins a block (direct) or a whole DAG (recursive), fetching it from the network if needed.
    * Returns false when it was already pinned recursively, i.e. by someone else's pin.
@@ -61,6 +62,10 @@ export class HttpKubo implements Kubo {
     } catch (err) {
       if (!(err instanceof KuboError && /not pinned/.test(err.message))) throw err
     }
+  }
+
+  async removeKey(name: string): Promise<void> {
+    await this.call('key/rm', { arg: name })
   }
 
   async pin(cid: CID, recursive: boolean): Promise<boolean> {

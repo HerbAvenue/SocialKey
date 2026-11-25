@@ -28,6 +28,7 @@ export function Settings() {
         <HandleSettings did={own.author} current={own.profile.handle} />
         <ShareCard did={own.author} handle={own.profile.handle} />
         <NotificationSettings />
+        <BackupCard />
         <ConnectionCard />
       </div>
     </>
@@ -337,6 +338,21 @@ function NotificationSettings() {
         />
         {supported ? 'Show system notifications' : "This browser doesn't support notifications"}
       </label>
+    </Section>
+  )
+}
+
+function BackupCard() {
+  return (
+    <Section
+      title="Back up your account"
+      description="Your account is a key on your computer. If that computer is lost, your recovery phrase is the only way back."
+    >
+      <p className="text-sm">
+        Open the SocialKey desktop app and choose <b>Show recovery phrase</b>. Write the 24 words down and keep them
+        somewhere safe. To move to a new computer, install SocialKey there and use <b>Restore an account</b>: your
+        profile, posts and follows come back from the network.
+      </p>
     </Section>
   )
 }

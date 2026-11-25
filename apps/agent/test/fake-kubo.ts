@@ -36,6 +36,10 @@ export class FakeKubo implements Kubo {
     return this.block(cid)
   }
 
+  async removeKey(name: string): Promise<void> {
+    this.keys = this.keys.filter((k) => k.name !== name)
+  }
+
   async unpin(cid: CID): Promise<void> {
     this.unpinned.push(cid)
     this.pins.delete(cid.toString())

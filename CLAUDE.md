@@ -73,6 +73,7 @@ Agent config is via env: `SOCIALKEY_PORT` (4040), `KUBO_API` (http://127.0.0.1:5
 - One Ed25519 keypair per user is the identity, the signing key, **and** the IPNS key. The agent stores it in `<dataDir>/key.json` (mode 0600) and imports it into Kubo, so the IPNS name is derived from the public key.
 - Canonical identifier: `did:key` (`z6Mk…`). `core/src/did.ts` converts between did:key and the base36 IPNS name (`k51…`) in both directions; the frontend resolves `ipns://<didToIpnsName(did)>`.
 - On startup the agent checks that Kubo's key ID equals the IPNS name `core` derives, and refuses to run on mismatch.
+- Backup is a 24-word BIP-39 encoding of the 32-byte seed (`core/src/recovery.ts`). Restoring (`replaceIdentity` in `agent/src/keystore.ts`) moves the old identity's files into `<dataDir>/archive-<time>/` (never deletes a key), writes the new key and removes Kubo's old key name. When a key exists but `manifest.dagjson` doesn't, `Publisher.init({ recover: true })` adopts the profile found on the network and re-pins its posts in the background, instead of publishing a blank profile over it. Fresh identities skip this (no point waiting on a DHT lookup).
 
 ### Data model (`core/src/schemas.ts`)
 Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) carry `author` (did:key) and `sig`.

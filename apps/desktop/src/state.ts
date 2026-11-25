@@ -21,5 +21,7 @@ export interface SocialKeyBridge {
   copy(text: string): Promise<void>
   setAutostart(enabled: boolean): Promise<void>
   setHostFollows(enabled: boolean): Promise<void>
+  getRecoveryPhrase(): Promise<string>
+  restoreAccount(phrase: string): Promise<{ ok: boolean; message: string }>
   retry(): Promise<void>
 }

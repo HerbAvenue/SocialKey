@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { generateSecretKey, type Identity, identityFromSecretKey } from '@socialkey/core'
 import type { Kubo } from './kubo'
@@ -20,6 +20,34 @@ export async function loadOrCreateIdentity(dataDir: string): Promise<{ identity:
   const keyFile: KeyFile = { secretKey: Buffer.from(secretKey).toString('base64') }
   await writeFile(file, JSON.stringify(keyFile), { mode: 0o600, flag: 'wx' })
   return { identity: identityFromSecretKey(secretKey), created: true }
+}
+
+/** Files that belong to one identity; restoring another moves them aside. */
+const IDENTITY_FILES = ['key.json', 'manifest.dagjson', 'tokens.json', 'hosted.json']
+
+/**
+ * Switches the data dir to another identity (from a recovery phrase). The
+ * current identity's files are moved to `archive-<time>/`, never deleted, and
+ * Kubo's copy of the old key is removed so the new one can take its name.
+ * Returns the archive directory.
+ */
+export async function replaceIdentity(
+  dataDir: string,
+  secretKey: Uint8Array,
+  kubo: Kubo,
+  keyName: string,
+): Promise<string> {
+  const archive = join(dataDir, `archive-${new Date().toISOString().replace(/[:.]/g, '-')}`)
+  await mkdir(archive, { recursive: true, mode: 0o700 })
+  for (const file of IDENTITY_FILES) {
+    await rename(join(dataDir, file), join(archive, file)).catch((err: NodeJS.ErrnoException) => {
+      if (err.code !== 'ENOENT') throw err
+    })
+  }
+  const keyFile: KeyFile = { secretKey: Buffer.from(secretKey).toString('base64') }
+  await writeFile(join(dataDir, 'key.json'), JSON.stringify(keyFile), { mode: 0o600, flag: 'wx' })
+  if ((await kubo.listKeys()).some((k) => k.name === keyName)) await kubo.removeKey(keyName)
+  return archive
 }
 
 /**

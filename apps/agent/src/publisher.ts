@@ -76,12 +76,18 @@ export class Publisher {
     this.now = deps.now ?? (() => new Date())
   }
 
-  async init(defaultDisplayName: string): Promise<void> {
+  /**
+   * Loads the saved manifest. Without one, `recover` first looks for this
+   * identity's profile on the network (after restoring a key or reinstalling),
+   * so an existing profile is never overwritten by a blank one.
+   */
+  async init(defaultDisplayName: string, { recover = false }: { recover?: boolean } = {}): Promise<void> {
     let bytes: Uint8Array
     try {
       bytes = await readFile(this.deps.stateFile)
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
+      if (recover && (await this.recoverFromNetwork())) return
       await this.commit(emptyManifest(this.deps.identity.did, defaultDisplayName, this.now()))
       return
     }
@@ -94,6 +100,51 @@ export class Publisher {
     // Re-store and republish in case Kubo's repo was reset since the last run.
     await this.deps.kubo.putBlock(bytes)
     await this.deps.kubo.publish(this.manifestCid, this.deps.keyName)
+  }
+
+  private async recoverFromNetwork(): Promise<boolean> {
+    const { kubo, identity } = this.deps
+    let cid: CID
+    let bytes: Uint8Array
+    try {
+      cid = await kubo.resolveName(identity.ipnsName)
+      bytes = await kubo.getBlock(cid)
+    } catch {
+      return false
+    }
+    const manifest = readManifest(bytes)
+    if (manifest.author !== identity.did) return false
+    await kubo.putBlock(bytes)
+    await writeFile(this.deps.stateFile, bytes)
+    this.manifest = manifest
+    this.manifestCid = cid
+    // Take back hosting of your own posts; followers have been keeping copies.
+    void this.repinOwnContent(manifest)
+    return true
+  }
+
+  private async repinOwnContent(manifest: Manifest): Promise<void> {
+    const { kubo } = this.deps
+    const posts = [...manifest.posts]
+    for (let next = manifest.olderPosts; next; ) {
+      const pageBytes = await kubo.getBlock(next).catch(() => undefined)
+      if (!pageBytes) break
+      await kubo.putBlock(pageBytes).catch(() => {})
+      const page = readPostPage(pageBytes)
+      posts.push(...page.posts)
+      next = page.prev
+    }
+    for (const media of [manifest.profile.avatar, manifest.profile.banner])
+      if (media) await kubo.pin(media, true).catch(() => {})
+    for (const cid of posts) {
+      try {
+        const postBytes = await kubo.getBlock(cid)
+        await kubo.putBlock(postBytes)
+        for (const media of readPost(postBytes).media) await kubo.pin(media, true).catch(() => {})
+      } catch {
+        // Unreachable posts stay with whoever still has them.
+      }
+    }
   }
 
   get current(): { manifest: Manifest; cid: CID } {
