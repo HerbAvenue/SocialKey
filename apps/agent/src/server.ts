@@ -83,7 +83,15 @@ export async function buildServer({ config, publisher, auth, logger = false }: D
   })
 
   if (config.webRoot) {
-    await app.register(fastifyStatic, { root: config.webRoot, prefix: WEB_PREFIX })
+    await app.register(fastifyStatic, {
+      root: config.webRoot,
+      prefix: WEB_PREFIX,
+      // Built assets have content hashes in their names; index.html must always be fresh
+      // so an updated app never serves a page pointing at assets that no longer exist.
+      setHeaders: (reply, path) => {
+        reply.header('cache-control', /[\\/]assets[\\/]/.test(path) ? 'public, max-age=31536000, immutable' : 'no-cache')
+      },
+    })
     app.get('/', (_req, reply) => reply.redirect(WEB_PREFIX))
   }
 

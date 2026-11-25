@@ -91,6 +91,7 @@ describe('agent HTTP API', () => {
     const res = await app.inject({ method: 'GET', url: '/app/' })
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('web')
+    expect(res.headers['cache-control']).toBe('no-cache')
   })
 
   it('likes, pins and deletes through the API', async () => {

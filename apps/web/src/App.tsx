@@ -1,41 +1,38 @@
-import { NavLink, Route, Routes } from 'react-router'
-import { useMe } from './lib/queries'
+import { Route, Routes } from 'react-router'
+import { AppProvider } from './components/AppContext'
+import { Layout } from './components/Layout'
+import { EmptyState } from './components/ui'
 import { Connect } from './pages/Connect'
+import { Explore } from './pages/Explore'
+import { GetApp } from './pages/GetApp'
 import { Home } from './pages/Home'
-import { Profile } from './pages/Profile'
+import { Notifications } from './pages/Notifications'
+import { PostPage } from './pages/PostPage'
+import { FollowList, Profile } from './pages/Profile'
+import { Search } from './pages/Search'
 import { Settings } from './pages/Settings'
+import { Tag } from './pages/Tag'
 
 export function App() {
-  const me = useMe().data
-  const link = ({ isActive }: { isActive: boolean }) => (isActive ? 'font-semibold' : 'text-stone-500')
   return (
-    <div className="mx-auto min-h-screen max-w-xl border-x border-stone-200 dark:border-stone-800">
-      <nav className="sticky top-0 flex gap-4 border-b border-stone-200 bg-stone-50/90 px-4 py-3 backdrop-blur dark:border-stone-800 dark:bg-stone-950/90">
-        <NavLink to="/" end className={link}>
-          Home
-        </NavLink>
-        {me && (
-          <NavLink to={`/u/${me.did}`} className={link}>
-            Profile
-          </NavLink>
-        )}
-        {me && (
-          <NavLink to="/settings" className={link}>
-            Settings
-          </NavLink>
-        )}
-        <NavLink to="/connect" className={(s) => `ml-auto ${link(s)}`}>
-          {me ? 'Agent' : 'Connect'}
-        </NavLink>
-      </nav>
-      <main>
-        <Routes>
+    <AppProvider>
+      <Routes>
+        <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/u/:did" element={<Profile />} />
-          <Route path="/connect" element={<Connect />} />
+          <Route path="/explore" element={<Explore />} />
+          <Route path="/search" element={<Search />} />
+          <Route path="/tag/:tag" element={<Tag />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/u/:id" element={<Profile />} />
+          <Route path="/u/:id/following" element={<FollowList kind="following" />} />
+          <Route path="/u/:id/followers" element={<FollowList kind="followers" />} />
+          <Route path="/p/:cid" element={<PostPage />} />
           <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </main>
-    </div>
+          <Route path="/connect" element={<Connect />} />
+          <Route path="/get" element={<GetApp />} />
+          <Route path="*" element={<EmptyState title="Page not found" />} />
+        </Route>
+      </Routes>
+    </AppProvider>
   )
 }

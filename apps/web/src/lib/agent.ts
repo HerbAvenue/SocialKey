@@ -13,9 +13,22 @@ export interface ProfileInput {
   displayName?: string
   bio?: string | null
   avatar?: string | null
+  banner?: string | null
   website?: string | null
   location?: string | null
+  handle?: string | null
 }
+
+export interface NewPost {
+  text: string
+  media?: string[]
+  replyTo?: string
+  quoteOf?: string
+  repostOf?: string
+  mentions?: string[]
+}
+
+type Written = { manifestCid: string }
 
 export class AgentError extends Error {
   constructor(
@@ -66,11 +79,15 @@ export const agent = {
   },
   unpair: () => setToken(null),
   me: () => request<Me>('GET', '/me'),
-  createPost: (text: string, media: string[] = []) =>
-    request<{ cid: string; manifestCid: string }>('POST', '/posts', { text, media }),
+  isPaired: () => getToken() !== null,
+  createPost: (post: NewPost) => request<{ cid: string } & Written>('POST', '/posts', post),
+  deletePost: (cid: string) => request<Written>('DELETE', `/posts/${cid}`),
+  like: (cid: string) => request<Written>('POST', '/likes', { cid }),
+  unlike: (cid: string) => request<Written>('DELETE', `/likes/${cid}`),
+  pin: (cid: string | null) => request<Written>('PUT', '/pinned', { cid }),
   uploadMedia: (file: File) =>
     request<{ cid: string }>('POST', '/media', file, file.type || 'application/octet-stream'),
-  updateProfile: (input: ProfileInput) => request<{ manifestCid: string }>('PUT', '/profile', input),
-  follow: (did: string) => request<{ manifestCid: string }>('POST', '/follows', { did }),
-  unfollow: (did: string) => request<{ manifestCid: string }>('DELETE', `/follows/${encodeURIComponent(did)}`),
+  updateProfile: (input: ProfileInput) => request<Written>('PUT', '/profile', input),
+  follow: (did: string) => request<Written>('POST', '/follows', { did }),
+  unfollow: (did: string) => request<Written>('DELETE', `/follows/${encodeURIComponent(did)}`),
 }

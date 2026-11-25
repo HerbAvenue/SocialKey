@@ -1,11 +1,17 @@
-import type { CID, Manifest, TimelineEntry } from '@socialkey/core'
-import { mergeTimeline } from '@socialkey/core'
+import { CID, type Manifest, mergeTimeline, type TimelineEntry } from '@socialkey/core'
 import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import { agent, getToken } from './agent'
+import { didForHandle } from './dns'
 import { loadManifest, loadMediaUrl, loadPost, loadPostPage, setLocalGateway } from './ipfs'
+import { mergeNetworks, type Network, type Person } from './social'
 
-const POSTS_PER_AUTHOR = 20
+const POSTS_PER_FOLLOW = 20
+const POSTS_PER_EXTENDED = 5
+// Friends of friends loaded for Explore and notifications; each is an IPNS lookup.
+const MAX_EXTENDED_PEOPLE = 120
+const CONCURRENCY = 12
 const MANIFEST_TTL = 60_000
+const NETWORK_TTL = 5 * 60_000
 
 export function useMe() {
   return useQuery({
@@ -29,7 +35,7 @@ function manifestQuery(did: string, cid?: string) {
   }
 }
 
-function postQuery(cid: string) {
+export function postQuery(cid: string) {
   return {
     queryKey: ['post', cid],
     queryFn: ({ signal }: { signal: AbortSignal }) => loadPost(cid, signal),
@@ -45,6 +51,15 @@ export function useManifest(did: string | undefined) {
   return useQuery({ ...manifestQuery(did ?? '', cid), enabled: did !== undefined })
 }
 
+/** Your own manifest, or undefined when not paired. */
+export function useOwnManifest(): Manifest | undefined {
+  return useManifest(useMe().data?.did).data
+}
+
+export function usePost(cid: string | undefined) {
+  return useQuery({ ...postQuery(cid ?? ''), enabled: cid !== undefined })
+}
+
 export function useMediaUrl(cid: string) {
   const query = useQuery({
     queryKey: ['media', cid],
@@ -55,37 +70,143 @@ export function useMediaUrl(cid: string) {
   return query.data
 }
 
-/** Loads posts by CID, skipping any that fail to fetch or verify. */
-export async function fetchPosts(client: QueryClient, cids: CID[]): Promise<TimelineEntry[]> {
-  const results = await Promise.allSettled(
-    cids.map(async (cid) => ({ cid, post: await client.fetchQuery(postQuery(cid.toString())) })),
-  )
-  return results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+/** Resolves a domain handle to a did:key through DNS. */
+export function useHandle(handle: string | undefined) {
+  return useQuery({
+    queryKey: ['handle', handle],
+    queryFn: () => didForHandle(handle ?? ''),
+    enabled: handle !== undefined,
+    staleTime: 10 * 60_000,
+  })
 }
 
-/** Your posts plus the recent posts of everyone you follow, newest first. */
-export function useTimeline(me: { did: string; manifestCid: string } | undefined, own: Manifest | undefined) {
+/** True when the profile's claimed handle has a DNS record pointing back at it. */
+export function useVerifiedHandle(manifest: Manifest | undefined): string | undefined {
+  const handle = manifest?.profile.handle
+  const resolved = useHandle(handle).data
+  return handle && resolved === manifest?.author ? handle : undefined
+}
+
+/** Loads posts by CID, skipping any that fail to fetch or verify. */
+export async function fetchPosts(client: QueryClient, cids: CID[]): Promise<TimelineEntry[]> {
+  const results = await mapSettled(cids, CONCURRENCY, async (cid) => ({
+    cid,
+    post: await client.fetchQuery(postQuery(cid.toString())),
+  }))
+  return results.filter((r) => r !== undefined)
+}
+
+/** Runs `fn` over items, at most `limit` at a time; failures become undefined. */
+async function mapSettled<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<(R | undefined)[]> {
+  const out: (R | undefined)[] = new Array(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      out[i] = await fn(items[i] as T).catch(() => undefined)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return out
+}
+
+async function loadPeople(client: QueryClient, dids: string[], depth: 1 | 2, postsEach: number): Promise<Network> {
+  const manifests = await mapSettled(dids, CONCURRENCY, (did) => client.fetchQuery(manifestQuery(did)))
+  const people = new Map<string, Person>()
+  manifests.forEach((manifest, i) => {
+    const did = dids[i]
+    if (manifest && did) people.set(did, { did, manifest, depth })
+  })
+  const posts = await fetchPosts(
+    client,
+    [...people.values()].flatMap((p) => p.manifest.posts.slice(0, postsEach)),
+  )
+  return { people, posts: mergeTimeline([posts]) }
+}
+
+/** You and everyone you follow, with their recent posts. Feeds the home timeline. */
+export function useCircle() {
   const client = useQueryClient()
+  const own = useOwnManifest()
   return useQuery({
-    queryKey: ['timeline', me?.manifestCid],
-    enabled: me !== undefined && own !== undefined,
+    // Keyed by who you follow, not your manifest CID: liking a post shouldn't reload everyone.
+    queryKey: ['network', 'circle', own?.author, own?.follows.join(',')],
+    enabled: own !== undefined,
     staleTime: MANIFEST_TTL,
-    queryFn: async () => {
-      if (!own) return []
-      // A profile that fails to resolve or verify is skipped, never fatal.
-      const others = await Promise.allSettled(own.follows.map((did) => client.fetchQuery(manifestQuery(did))))
-      const manifests = [own, ...others.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))]
-      const lists = await Promise.all(manifests.map((m) => fetchPosts(client, m.posts.slice(0, POSTS_PER_AUTHOR))))
-      return mergeTimeline(lists)
+    queryFn: async (): Promise<Network> => {
+      if (!own) return { people: new Map(), posts: [] }
+      return loadPeople(client, own.follows, 1, POSTS_PER_FOLLOW)
     },
   })
 }
 
-/** Follows a profile's `olderPosts` chain one page at a time. */
+/** Your circle plus friends of friends. Feeds Explore, notifications and search. */
+export function useExtendedNetwork() {
+  const client = useQueryClient()
+  const own = useOwnManifest()
+  const circle = useCircle().data
+  return useQuery({
+    queryKey: ['network', 'extended', own?.author, own?.follows.join(',')],
+    enabled: own !== undefined && circle !== undefined,
+    staleTime: NETWORK_TTL,
+    queryFn: async (): Promise<Network> => {
+      if (!own || !circle) return { people: new Map(), posts: [] }
+      const known = new Set([own.author, ...circle.people.keys()])
+      const counts = new Map<string, number>()
+      for (const person of circle.people.values()) {
+        for (const did of person.manifest.follows) if (!known.has(did)) counts.set(did, (counts.get(did) ?? 0) + 1)
+      }
+      const candidates = [...counts].sort((a, b) => b[1] - a[1]).slice(0, MAX_EXTENDED_PEOPLE)
+      const extended = await loadPeople(
+        client,
+        candidates.map(([did]) => did),
+        2,
+        POSTS_PER_EXTENDED,
+      )
+      return mergeNetworks(circle, extended)
+    },
+  })
+}
+
+/** Your own recent posts. */
+export function useOwnPosts() {
+  const client = useQueryClient()
+  const own = useOwnManifest()
+  return useQuery({
+    queryKey: ['own-posts', own?.posts.map(String).join(',')],
+    enabled: own !== undefined,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: () => fetchPosts(client, own?.posts ?? []),
+  })
+}
+
+/** Everything loaded so far: you, your circle and (once loaded) friends of friends. */
+export function useKnownNetwork(): Network | undefined {
+  const own = useOwnManifest()
+  const ownPosts = useOwnPosts().data
+  const circle = useCircle().data
+  const extended = useExtendedNetwork().data
+  if (!own || !circle) return undefined
+  const self: Network = {
+    people: new Map([[own.author, { did: own.author, manifest: own, depth: 0 }]]),
+    posts: ownPosts ?? [],
+  }
+  return mergeNetworks(self, extended ?? circle)
+}
+
+/** A profile's posts: the recent list, then older pages on demand. */
 export async function loadOlderPosts(
   client: QueryClient,
   page: CID,
 ): Promise<{ entries: TimelineEntry[]; next?: CID }> {
   const { posts, prev } = await loadPostPage(page)
   return { entries: await fetchPosts(client, posts), next: prev }
+}
+
+export function parseCid(value: string | undefined): CID | undefined {
+  try {
+    return value ? CID.parse(value) : undefined
+  } catch {
+    return undefined
+  }
 }

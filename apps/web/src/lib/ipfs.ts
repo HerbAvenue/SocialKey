@@ -1,4 +1,4 @@
-import { createVerifiedFetch, type VerifiedFetch } from '@helia/verified-fetch'
+import type { VerifiedFetch } from '@helia/verified-fetch'
 import {
   CID,
   cidOf,
@@ -30,9 +30,14 @@ export function setLocalGateway(gateway: string | null): void {
   localGateway = gateway
 }
 
-/** Used only when no agent is paired: public trustless gateways and delegated routing. */
+/**
+ * Used only when no agent is paired: public trustless gateways and delegated routing.
+ * Loaded on demand, since Helia is most of the bundle and paired users never need it.
+ */
 function getVerifiedFetch(): Promise<VerifiedFetch> {
-  verifiedFetch ??= createVerifiedFetch({ gateways: GATEWAYS, routers: ROUTERS })
+  verifiedFetch ??= import('@helia/verified-fetch').then(({ createVerifiedFetch }) =>
+    createVerifiedFetch({ gateways: GATEWAYS, routers: ROUTERS }),
+  )
   return verifiedFetch
 }
 

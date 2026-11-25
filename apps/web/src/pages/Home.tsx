@@ -1,66 +1,70 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { mergeTimeline } from '@socialkey/core'
+import { useQueryClient } from '@tanstack/react-query'
+import { RefreshCw, Users } from 'lucide-react'
+import { Link } from 'react-router'
 import { Composer } from '../components/Composer'
 import { PostList } from '../components/PostList'
-import { useManifest, useMe, useTimeline } from '../lib/queries'
+import { EmptyState, PageHeader, PostSkeleton } from '../components/ui'
+import { WhoToFollow } from '../components/WhoToFollow'
+import { useCircle, useMe, useOwnManifest, useOwnPosts } from '../lib/queries'
+import { Landing } from './Landing'
 
 export function Home() {
   const me = useMe()
-  const own = useManifest(me.data?.did)
-  const timeline = useTimeline(me.data, own.data)
+  if (!me.data) return me.isLoading ? <PostSkeletons /> : <Landing />
+  return <Timeline />
+}
 
-  if (!me.data) return <Welcome />
+function Timeline() {
+  const client = useQueryClient()
+  const own = useOwnManifest()
+  const circle = useCircle()
+  const ownPosts = useOwnPosts()
+  const entries = mergeTimeline([ownPosts.data ?? [], circle.data?.posts ?? []])
+  const loading = !own || circle.isPending
+
   return (
     <>
-      <Composer />
-      <div className="border-b border-stone-200 p-4 dark:border-stone-800">
-        <FindProfile />
+      <PageHeader title="Home">
+        <button
+          type="button"
+          aria-label="Refresh"
+          title="Refresh"
+          onClick={() => client.invalidateQueries({ queryKey: ['network'] })}
+          className="rounded-full p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800"
+        >
+          <RefreshCw className={`size-5 ${circle.isFetching ? 'animate-spin' : ''}`} />
+        </button>
+      </PageHeader>
+      <div className="hidden border-b border-stone-200 px-4 py-3 sm:block dark:border-stone-800">
+        <Composer />
       </div>
-      {timeline.isPending ? (
-        <p className="p-8 text-center text-stone-500">Loading timeline…</p>
+      {loading ? (
+        <PostSkeletons />
       ) : (
-        <PostList entries={timeline.data ?? []} empty="No posts yet. Write one, or follow someone." />
+        <PostList
+          entries={entries}
+          empty={
+            <>
+              <EmptyState icon={<Users className="size-7" />} title="Welcome to SocialKey!">
+                Your timeline shows posts from people you follow. Write your first post, or{' '}
+                <Link to="/explore" className="text-brand-600 hover:underline">
+                  find people to follow
+                </Link>
+                .
+              </EmptyState>
+              <div className="px-4">
+                <WhoToFollow />
+              </div>
+            </>
+          }
+        />
       )}
     </>
   )
 }
 
-function Welcome() {
-  return (
-    <div className="space-y-6 p-6">
-      <p>
-        SocialKey profiles live on IPFS, hosted by their owners. Browse anyone's profile by their did:key, or{' '}
-        <Link to="/connect" className="font-semibold underline">
-          connect your local agent
-        </Link>{' '}
-        to post and see your timeline.
-      </p>
-      <FindProfile />
-    </div>
-  )
-}
-
-/** Opens a profile by its ID, which is where you follow someone. */
-function FindProfile() {
-  const navigate = useNavigate()
-  const [did, setDid] = useState('')
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (did.trim()) navigate(`/u/${did.trim()}`)
-      }}
-      className="flex gap-2"
-    >
-      <input
-        value={did}
-        onChange={(e) => setDid(e.target.value)}
-        placeholder="Paste someone's ID (did:key:z6Mk…) to view or follow them"
-        className="min-w-0 flex-1 rounded-lg border border-stone-300 bg-transparent px-3 py-2 dark:border-stone-700"
-      />
-      <button type="submit" className="rounded-lg border border-stone-300 px-4 dark:border-stone-700">
-        View
-      </button>
-    </form>
-  )
+function PostSkeletons() {
+  // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholders
+  return Array.from({ length: 5 }, (_, i) => <PostSkeleton key={i} />)
 }
