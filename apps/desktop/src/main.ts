@@ -5,6 +5,7 @@ import { loadConfig, type RunningAgent, startAgent } from '@socialkey/agent'
 import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { isAutostartEnabled, setAutostart } from './autostart'
 import { KuboDaemon } from './kubo-daemon'
+import { loadSettings, type Settings, saveSettings } from './settings'
 import type { AppState } from './state'
 
 const AGENT_PORT = 4040
@@ -18,7 +19,8 @@ let tray: Tray | null = null
 let agent: RunningAgent | null = null
 let peerTimer: NodeJS.Timeout | undefined
 let quitting = false
-let state: AppState = { phase: 'starting', peers: 0, autostart: false }
+let state: AppState = { phase: 'starting', peers: 0, autostart: false, hostFollows: true, hostedProfiles: 0 }
+let settings: Settings = { hostFollows: true }
 
 const kubo = new KuboDaemon(kuboBinary(), join(DATA_DIR, 'kubo'), KUBO_PORTS)
 const webRoot = app.isPackaged ? join(process.resourcesPath, 'web') : join(__dirname, '../../web/dist')
@@ -51,6 +53,7 @@ async function startServices(): Promise<void> {
         kuboGateway: kubo.gatewayUrl,
         dataDir: DATA_DIR,
         webRoot: existsSync(webRoot) ? webRoot : undefined,
+        hostFollows: settings.hostFollows,
       },
       { onPairingCode: (pairingCode) => update({ pairingCode }) },
     )
@@ -74,7 +77,10 @@ async function refreshStatus(): Promise<void> {
   if (!agent) return
   const displayName = agent.publisher.current.manifest.profile.displayName
   const peers = await kubo.peerCount().catch(() => state.peers)
-  if (peers !== state.peers || displayName !== state.displayName) update({ peers, displayName })
+  const hostedProfiles = agent.hoster?.status().profiles ?? 0
+  if (peers !== state.peers || displayName !== state.displayName || hostedProfiles !== state.hostedProfiles) {
+    update({ peers, displayName, hostedProfiles })
+  }
 }
 
 async function stopServices(): Promise<void> {
@@ -193,6 +199,14 @@ ipcMain.handle('get-state', () => state)
 ipcMain.handle('open-web', openWeb)
 ipcMain.handle('copy', (_event, text: string) => clipboard.writeText(text))
 ipcMain.handle('set-autostart', (_event, enabled: boolean) => changeAutostart(enabled))
+ipcMain.handle('set-host-follows', async (_event, enabled: boolean) => {
+  settings = { ...settings, hostFollows: enabled }
+  await saveSettings(DATA_DIR, settings)
+  update({ hostFollows: enabled, hostedProfiles: 0 })
+  // The agent reads this at startup, so restart it.
+  await stopServices()
+  await startServices()
+})
 ipcMain.handle('retry', async () => {
   await stopServices()
   await startServices()
@@ -214,8 +228,10 @@ if (!app.requestSingleInstanceLock()) {
   // Must match electron-builder's appId so Windows groups the taskbar icon with the shortcut.
   app.setAppUserModelId('org.socialkey.desktop')
 
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
     state.autostart = isAutostartEnabled()
+    settings = await loadSettings(DATA_DIR)
+    state.hostFollows = settings.hostFollows
     createTray()
     // Launched at login with --hidden: stay in the tray.
     if (!process.argv.includes('--hidden')) showWindow()

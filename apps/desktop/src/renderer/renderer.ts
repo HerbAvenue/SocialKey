@@ -11,6 +11,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const statusEl = $('status')
 const autostart = $<HTMLInputElement>('autostart')
+const hostFollows = $<HTMLInputElement>('host-follows')
 
 function render(state: AppState): void {
   const online = state.phase === 'online'
@@ -32,6 +33,11 @@ function render(state: AppState): void {
   $<HTMLButtonElement>('copy-code').disabled = !state.pairingCode
   $('agent-url').textContent = state.agentUrl ?? '…'
   autostart.checked = state.autostart
+  hostFollows.checked = state.hostFollows
+  $('hosting-status').textContent =
+    state.hostFollows && state.hostedProfiles > 0
+      ? `Keeping ${state.hostedProfiles} ${state.hostedProfiles === 1 ? 'person' : 'people'} you follow online.`
+      : 'Uses a little disk space and bandwidth.'
 }
 
 function copyButton(id: string, text: () => string | undefined): void {
@@ -60,5 +66,6 @@ void api.getState().then((state) => {
 $('open-web').addEventListener('click', () => void api.openWeb())
 $('retry').addEventListener('click', () => void api.retry())
 autostart.addEventListener('change', () => void api.setAutostart(autostart.checked))
+hostFollows.addEventListener('change', () => void api.setHostFollows(hostFollows.checked))
 copyButton('copy-did', () => current?.did)
 copyButton('copy-code', () => current?.pairingCode)

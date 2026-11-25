@@ -9,6 +9,9 @@ export interface AppState {
   agentUrl?: string
   pairingCode?: string
   autostart: boolean
+  /** Whether this app helps keep the people you follow online, and how many it hosts. */
+  hostFollows: boolean
+  hostedProfiles: number
 }
 
 export interface SocialKeyBridge {
@@ -17,5 +20,6 @@ export interface SocialKeyBridge {
   openWeb(): Promise<void>
   copy(text: string): Promise<void>
   setAutostart(enabled: boolean): Promise<void>
+  setHostFollows(enabled: boolean): Promise<void>
   retry(): Promise<void>
 }

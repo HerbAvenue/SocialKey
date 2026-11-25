@@ -9,6 +9,7 @@ const bridge: SocialKeyBridge = {
   openWeb: () => ipcRenderer.invoke('open-web'),
   copy: (text) => ipcRenderer.invoke('copy', text),
   setAutostart: (enabled) => ipcRenderer.invoke('set-autostart', enabled),
+  setHostFollows: (enabled) => ipcRenderer.invoke('set-host-follows', enabled),
   retry: () => ipcRenderer.invoke('retry'),
 }
 
