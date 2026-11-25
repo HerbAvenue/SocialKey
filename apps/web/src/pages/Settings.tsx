@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BadgeCheck, Camera, CircleAlert, Copy, LoaderCircle } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router'
+import { setSystemNotifications, systemNotificationsEnabled } from '../components/Alerts'
 import { useApp } from '../components/AppContext'
 import { Avatar } from '../components/Avatar'
 import { MediaImage } from '../components/MediaImage'
@@ -26,6 +27,7 @@ export function Settings() {
         <ProfileForm key={own.updatedAt} did={own.author} profile={own.profile} />
         <HandleSettings did={own.author} current={own.profile.handle} />
         <ShareCard did={own.author} handle={own.profile.handle} />
+        <NotificationSettings />
         <ConnectionCard />
       </div>
     </>
@@ -307,6 +309,34 @@ function ShareCard({ did, handle }: { did: string; handle?: string }) {
           </div>
         </div>
       </div>
+    </Section>
+  )
+}
+
+function NotificationSettings() {
+  const { toast } = useApp()
+  const [on, setOn] = useState(systemNotificationsEnabled)
+  const supported = 'Notification' in window
+  return (
+    <Section
+      title="Notifications"
+      description="Get a system notification for new messages and activity while SocialKey is in a background tab."
+    >
+      <label className="flex items-center gap-3 text-sm font-semibold">
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={!supported}
+          onChange={async (e) => {
+            const enabled = await setSystemNotifications(e.target.checked)
+            setOn(enabled)
+            if (e.target.checked && !enabled)
+              toast('Notifications are blocked for this site in your browser settings', 'error')
+          }}
+          className="size-4 accent-brand-600"
+        />
+        {supported ? 'Show system notifications' : "This browser doesn't support notifications"}
+      </label>
     </Section>
   )
 }

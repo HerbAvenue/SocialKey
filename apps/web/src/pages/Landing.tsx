@@ -1,13 +1,27 @@
+import { useQuery } from '@tanstack/react-query'
 import { Download, Globe, HardDrive, KeyRound, Lock, ShieldCheck, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { Logo, SearchBox } from '../components/Layout'
+import { AGENT_URL } from '../lib/config'
 import { DOWNLOAD_URL } from '../lib/share'
 
 /** What visitors without the desktop app see at the home page. */
 export function Landing() {
+  const agentRunning = useAgentRunning()
   return (
     <div>
+      {agentRunning && (
+        <Link
+          to="/connect"
+          className="flex items-center justify-between gap-3 bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700"
+        >
+          <span className="flex items-center gap-2">
+            <KeyRound className="size-4" /> Your SocialKey app is running on this computer.
+          </span>
+          <span className="underline">Connect</span>
+        </Link>
+      )}
       <section className="relative overflow-hidden border-b border-stone-200 px-6 pt-10 pb-12 dark:border-stone-800">
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,var(--color-brand-100),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--color-brand-600)_25%,transparent),transparent_70%)]" />
         <div className="sm:hidden">
@@ -89,6 +103,24 @@ export function Landing() {
         </ol>
       </section>
     </div>
+  )
+}
+
+/**
+ * Whether a SocialKey app answers on this computer. A no-cors request can't
+ * read the reply, but it only succeeds if something is listening.
+ */
+function useAgentRunning(): boolean {
+  return (
+    useQuery({
+      queryKey: ['agent-running'],
+      queryFn: async () => {
+        await fetch(`${AGENT_URL}/health`, { mode: 'no-cors', signal: AbortSignal.timeout(1500) })
+        return true
+      },
+      retry: false,
+      staleTime: 30_000,
+    }).data ?? false
   )
 }
 

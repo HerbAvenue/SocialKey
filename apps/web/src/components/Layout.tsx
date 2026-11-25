@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useMe, useOwnManifest } from '../lib/queries'
 import { useUnreadMessages } from '../pages/Messages'
 import { useUnreadCount } from '../pages/Notifications'
+import { Alerts } from './Alerts'
 import { useApp } from './AppContext'
 import { Avatar } from './Avatar'
 import { inputClass } from './ui'
@@ -43,6 +44,7 @@ export function Layout() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl justify-center">
+      {me && <Alerts />}
       {/* Left rail: icons on tablets, full labels on desktops. */}
       <header className="sticky top-0 hidden h-screen w-20 shrink-0 flex-col items-center gap-1 px-2 py-4 sm:flex xl:w-64 xl:items-stretch xl:px-4">
         <NavLink to="/" className="mb-4 px-2" aria-label="SocialKey home">
