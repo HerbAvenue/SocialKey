@@ -15,7 +15,7 @@ import {
   unreadConversations,
   useConversations,
 } from '../lib/messages'
-import { useMe, useOwnManifest } from '../lib/queries'
+import { useMe, useModeration, useOwnManifest } from '../lib/queries'
 import { fullDate, timeAgo } from '../lib/time'
 
 export function useUnreadMessages(): number {
@@ -36,9 +36,10 @@ export function Messages() {
   const chats = useConversations(network)
   const [composing, setComposing] = useState(false)
   const marks = readMarks()
-  const list = [...(chats.data ?? new Map<string, ChatMessage[]>())].sort((a, b) =>
-    (b[1].at(-1)?.createdAt ?? '').localeCompare(a[1].at(-1)?.createdAt ?? ''),
-  )
+  const { blocked } = useModeration()
+  const list = [...(chats.data ?? new Map<string, ChatMessage[]>())]
+    .filter(([did]) => !blocked.has(did))
+    .sort((a, b) => (b[1].at(-1)?.createdAt ?? '').localeCompare(a[1].at(-1)?.createdAt ?? ''))
 
   if (!me) return null
   return (
@@ -161,7 +162,8 @@ export function Chat() {
   const me = useMe().data
   const person = usePerson(did)
   const chats = useConversations(network)
-  const messages = chats.data?.get(did) ?? []
+  const { blocked } = useModeration()
+  const messages = blocked.has(did) ? [] : (chats.data?.get(did) ?? [])
   const [text, setText] = useState('')
   const bottom = useRef<HTMLDivElement>(null)
 
@@ -217,36 +219,42 @@ export function Chat() {
         })}
         <div ref={bottom} />
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (text.trim()) send.mutate()
-        }}
-        className="flex items-end gap-2 border-t border-stone-200 p-3 dark:border-stone-800"
-      >
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              if (text.trim()) send.mutate()
-            }
+      {blocked.has(did) ? (
+        <p className="border-t border-stone-200 p-4 text-center text-sm text-stone-500 dark:border-stone-800">
+          You blocked this account. Unblock them from their profile to message them.
+        </p>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (text.trim()) send.mutate()
           }}
-          rows={1}
-          placeholder="Write a message"
-          className={`${inputClass} max-h-32 resize-none rounded-3xl`}
-        />
-        <Button
-          type="submit"
-          aria-label="Send"
-          busy={send.isPending}
-          disabled={!text.trim()}
-          className="size-11 shrink-0 p-0"
+          className="flex items-end gap-2 border-t border-stone-200 p-3 dark:border-stone-800"
         >
-          {!send.isPending && <ArrowUp className="size-5" />}
-        </Button>
-      </form>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (text.trim()) send.mutate()
+              }
+            }}
+            rows={1}
+            placeholder="Write a message"
+            className={`${inputClass} max-h-32 resize-none rounded-3xl`}
+          />
+          <Button
+            type="submit"
+            aria-label="Send"
+            busy={send.isPending}
+            disabled={!text.trim()}
+            className="size-11 shrink-0 p-0"
+          >
+            {!send.isPending && <ArrowUp className="size-5" />}
+          </Button>
+        </form>
+      )}
     </div>
   )
 }

@@ -7,12 +7,14 @@ import { setSystemNotifications, systemNotificationsEnabled } from '../component
 import { useApp } from '../components/AppContext'
 import { Avatar } from '../components/Avatar'
 import { MediaImage } from '../components/MediaImage'
+import { UserRow } from '../components/People'
+import { useModerate } from '../components/PostCard'
 import { QrCode } from '../components/QrCode'
 import { Button, Card, inputClass, PageHeader, Spinner } from '../components/ui'
 import { agent } from '../lib/agent'
 import { AGENT_URL } from '../lib/config'
 import { didForHandle } from '../lib/dns'
-import { useMe, useOwnManifest } from '../lib/queries'
+import { useMe, useModeration, useOwnManifest } from '../lib/queries'
 import { profileLink } from '../lib/share'
 
 export function Settings() {
@@ -28,6 +30,7 @@ export function Settings() {
         <HandleSettings did={own.author} current={own.profile.handle} />
         <ShareCard did={own.author} handle={own.profile.handle} />
         <NotificationSettings />
+        <ModerationCard />
         <BackupCard />
         <ConnectionCard />
       </div>
@@ -338,6 +341,46 @@ function NotificationSettings() {
         />
         {supported ? 'Show system notifications' : "This browser doesn't support notifications"}
       </label>
+    </Section>
+  )
+}
+
+function ModerationCard() {
+  const { muted, blocked } = useModeration()
+  const moderate = useModerate()
+  const rows = [
+    ...[...blocked].map((did) => ({ did, list: 'blocked' as const })),
+    ...[...muted].filter((d) => !blocked.has(d)).map((did) => ({ did, list: 'muted' as const })),
+  ]
+  return (
+    <Section
+      title="Muted and blocked"
+      description="Only you can see these lists. People aren't told when you mute or block them."
+    >
+      {rows.length === 0 ? (
+        <p className="text-sm text-stone-500">
+          You haven't muted or blocked anyone. Use the ⋯ menu on a post or a profile's share menu.
+        </p>
+      ) : (
+        <div className="-mx-4">
+          {rows.map(({ did, list }) => (
+            <div key={did} className="flex items-center">
+              {/* The row's own follow button is hidden: blocked people shouldn't be one click from a follow. */}
+              <div className="min-w-0 flex-1 [&_button]:hidden">
+                <UserRow did={did} showBio={false} note={list === 'blocked' ? 'Blocked' : 'Muted'} />
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mr-4"
+                onClick={() => moderate(list, did, false, 'this account')}
+              >
+                {list === 'blocked' ? 'Unblock' : 'Unmute'}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </Section>
   )
 }

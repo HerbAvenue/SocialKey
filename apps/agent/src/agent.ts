@@ -6,6 +6,7 @@ import type { Config } from './config'
 import { Hoster } from './hoster'
 import { ensureKuboKey, loadOrCreateIdentity } from './keystore'
 import { HttpKubo } from './kubo'
+import { Moderation } from './moderation'
 import { Publisher } from './publisher'
 import { buildServer } from './server'
 
@@ -53,7 +54,8 @@ export async function startAgent(
   await hoster?.start()
 
   const auth = await Auth.load(join(config.dataDir, 'tokens.json'), onPairingCode)
-  const app = await buildServer({ config, publisher, auth, hoster, logger })
+  const moderation = await Moderation.load(join(config.dataDir, 'moderation.json'))
+  const app = await buildServer({ config, publisher, auth, hoster, moderation, logger })
   await app.listen({ host: config.host, port: config.port })
 
   return {

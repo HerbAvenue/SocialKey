@@ -1,5 +1,6 @@
 import { CID, type Manifest, mergeTimeline, type TimelineEntry } from '@socialkey/core'
 import { keepPreviousData, type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
 import { agent, getToken } from './agent'
 import { didForHandle } from './dns'
 import { loadManifest, loadMediaUrl, loadPost, loadPostPage, setLocalGateway } from './ipfs'
@@ -73,6 +74,32 @@ export function useMediaUrl(cid: string) {
     gcTime: Number.POSITIVE_INFINITY,
   })
   return query.data
+}
+
+export interface ModerationState {
+  muted: Set<string>
+  blocked: Set<string>
+  /** True for people whose posts you shouldn't see. */
+  hidden: (did: string) => boolean
+}
+
+const NOBODY: ModerationState = { muted: new Set(), blocked: new Set(), hidden: () => false }
+
+/** Your private mute and block lists, kept by your agent. */
+export function useModeration(): ModerationState {
+  const me = useMe().data
+  const lists = useQuery({
+    queryKey: ['moderation'],
+    queryFn: agent.moderation,
+    enabled: me !== undefined,
+    staleTime: Number.POSITIVE_INFINITY,
+  }).data
+  return useMemo(() => {
+    if (!lists) return NOBODY
+    const muted = new Set(lists.muted)
+    const blocked = new Set(lists.blocked)
+    return { muted, blocked, hidden: (did: string) => muted.has(did) || blocked.has(did) }
+  }, [lists])
 }
 
 /** Resolves a domain handle to a did:key through DNS. */

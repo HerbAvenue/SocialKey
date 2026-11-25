@@ -6,7 +6,7 @@ import { Composer } from '../components/Composer'
 import { PostList } from '../components/PostList'
 import { EmptyState, PageHeader, PostSkeleton } from '../components/ui'
 import { WhoToFollow } from '../components/WhoToFollow'
-import { useCircle, useMe, useOwnManifest, useOwnPosts } from '../lib/queries'
+import { useCircle, useMe, useModeration, useOwnManifest, useOwnPosts } from '../lib/queries'
 import { Landing } from './Landing'
 
 export function Home() {
@@ -20,7 +20,8 @@ function Timeline() {
   const own = useOwnManifest()
   const circle = useCircle()
   const ownPosts = useOwnPosts()
-  const entries = mergeTimeline([ownPosts.data ?? [], circle.data?.posts ?? []])
+  const { hidden } = useModeration()
+  const entries = mergeTimeline([ownPosts.data ?? [], (circle.data?.posts ?? []).filter((e) => !hidden(e.post.author))])
   const loading = !own || circle.isPending
 
   return (

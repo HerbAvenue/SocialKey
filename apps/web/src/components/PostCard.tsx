@@ -2,6 +2,7 @@ import type { CID, Post, TimelineEntry } from '@socialkey/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   BadgeCheck,
+  Ban,
   Ellipsis,
   Heart,
   Link as LinkIcon,
@@ -12,6 +13,7 @@ import {
   Repeat2,
   Share,
   Trash,
+  VolumeX,
 } from 'lucide-react'
 import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -315,11 +317,70 @@ function PostActions({ cid, post, large }: { cid: CID; post: Post; large: boolea
       </ActionButton>
       {post.author === me?.did ? (
         <OwnPostMenu cid={cid} pinned={own?.pinned?.equals(cid) ?? false} />
+      ) : paired ? (
+        <OtherPostMenu author={post.author} />
       ) : (
         <span className="w-8" />
       )}
     </div>
   )
+}
+
+/** Mute or block an author from any of their posts. */
+function OtherPostMenu({ author }: { author: string }) {
+  const person = usePerson(author)
+  const moderate = useModerate()
+  return (
+    <Menu
+      trigger={(toggle) => (
+        <button
+          type="button"
+          aria-label="More"
+          onClick={(e) => {
+            e.stopPropagation()
+            toggle()
+          }}
+          className="rounded-full p-2 hover:bg-stone-100 hover:text-stone-900 dark:hover:bg-stone-800 dark:hover:text-white"
+        >
+          <Ellipsis className="size-[18px]" />
+        </button>
+      )}
+      items={[
+        {
+          label: `Mute ${person.name}`,
+          icon: <VolumeX className="size-4" />,
+          onClick: () => moderate('muted', author, true, person.name),
+        },
+        {
+          label: `Block ${person.name}`,
+          icon: <Ban className="size-4" />,
+          danger: true,
+          onClick: () => moderate('blocked', author, true, person.name),
+        },
+      ]}
+    />
+  )
+}
+
+/** Adds or removes someone from your private mute or block list. */
+export function useModerate() {
+  const { toast } = useApp()
+  const client = useQueryClient()
+  return async (list: 'muted' | 'blocked', did: string, on: boolean, name: string) => {
+    if (
+      list === 'blocked' &&
+      on &&
+      !confirm(`Block ${name}? You'll stop following them and won't see their posts or messages. They won't be told.`)
+    )
+      return
+    try {
+      client.setQueryData(['moderation'], await agent.setModeration(list, did, on))
+      if (list === 'blocked') await client.invalidateQueries({ queryKey: ['me'] })
+      toast(`${on ? (list === 'muted' ? 'Muted' : 'Blocked') : list === 'muted' ? 'Unmuted' : 'Unblocked'} ${name}`)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), 'error')
+    }
+  }
 }
 
 function OwnPostMenu({ cid, pinned }: { cid: CID; pinned: boolean }) {

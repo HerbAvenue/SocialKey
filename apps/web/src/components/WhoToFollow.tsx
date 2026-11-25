@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { useOwnManifest } from '../lib/queries'
+import { useModeration, useOwnManifest } from '../lib/queries'
 import { suggestPeople } from '../lib/social'
 import { useApp } from './AppContext'
 import { UserRow } from './People'
@@ -7,8 +7,11 @@ import { UserRow } from './People'
 export function WhoToFollow({ limit, compact = false }: { limit?: number; compact?: boolean }) {
   const { network } = useApp()
   const own = useOwnManifest()
+  const { hidden } = useModeration()
   if (!network || !own) return null
-  const suggestions = suggestPeople(network, own).slice(0, limit)
+  const suggestions = suggestPeople(network, own)
+    .filter((s) => !hidden(s.person.did))
+    .slice(0, limit)
   if (suggestions.length === 0) return null
   return (
     <section className="overflow-hidden rounded-2xl border border-stone-200 dark:border-stone-800">

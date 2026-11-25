@@ -85,6 +85,9 @@ export const agent = {
   like: (cid: string) => request<Written>('POST', '/likes', { cid }),
   unlike: (cid: string) => request<Written>('DELETE', `/likes/${cid}`),
   pin: (cid: string | null) => request<Written>('PUT', '/pinned', { cid }),
+  moderation: () => request<{ muted: string[]; blocked: string[] }>('GET', '/moderation'),
+  setModeration: (list: 'muted' | 'blocked', did: string, on: boolean) =>
+    request<{ muted: string[]; blocked: string[] }>('PUT', `/moderation/${list}`, { did, on }),
   sendMessage: (to: string, text: string) => request<{ cid: string } & Written>('POST', '/messages', { to, text }),
   conversationKeys: (dids: string[]) =>
     request<{ keys: Record<string, { tag: string; key: string }> }>('POST', '/messages/keys', { dids }),

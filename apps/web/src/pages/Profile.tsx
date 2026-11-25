@@ -2,6 +2,7 @@ import { type CID, didKey, normalizeHandle, type TimelineEntry } from '@socialke
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BadgeCheck,
+  Ban,
   Copy,
   Link as LinkIcon,
   Mail,
@@ -9,6 +10,7 @@ import {
   Pin,
   QrCode as QrIcon,
   Share,
+  VolumeX,
   WifiOff,
   X,
 } from 'lucide-react'
@@ -18,12 +20,20 @@ import { useApp } from '../components/AppContext'
 import { Avatar } from '../components/Avatar'
 import { MediaImage } from '../components/MediaImage'
 import { FollowButton, UserRow } from '../components/People'
-import { Menu, PostCard, shortDid } from '../components/PostCard'
+import { Menu, PostCard, shortDid, useModerate } from '../components/PostCard'
 import { PostList } from '../components/PostList'
 import { PostText } from '../components/PostText'
 import { QrCode } from '../components/QrCode'
 import { Button, EmptyState, PageHeader, PostSkeleton, Spinner, Tabs } from '../components/ui'
-import { fetchPosts, loadOlderPosts, useHandle, useManifest, useMe, useVerifiedHandle } from '../lib/queries'
+import {
+  fetchPosts,
+  loadOlderPosts,
+  useHandle,
+  useManifest,
+  useMe,
+  useModeration,
+  useVerifiedHandle,
+} from '../lib/queries'
 import { profileLink } from '../lib/share'
 import { isRepost, knownFollowers } from '../lib/social'
 
@@ -52,6 +62,8 @@ function ProfileView({ did }: { did: string }) {
   const me = useMe().data
   const manifest = useManifest(did)
   const handle = useVerifiedHandle(manifest.data)
+  const moderation = useModeration()
+  const moderate = useModerate()
   const [tab, setTab] = useState<Tab>('posts')
   const [older, setOlder] = useState<{ entries: TimelineEntry[]; next?: CID }>({ entries: [] })
 
@@ -122,7 +134,39 @@ function ProfileView({ did }: { did: string }) {
             className="relative z-10 -mt-14 border-4 border-white dark:border-stone-950"
           />
           <div className="mt-3 flex items-center gap-2">
-            <ShareMenu did={did} handle={handle} />
+            <ShareMenu
+              did={did}
+              handle={handle}
+              extra={
+                me && me.did !== did
+                  ? [
+                      moderation.muted.has(did)
+                        ? {
+                            label: 'Unmute',
+                            icon: <VolumeX className="size-4" />,
+                            onClick: () => moderate('muted', did, false, profile.displayName),
+                          }
+                        : {
+                            label: 'Mute',
+                            icon: <VolumeX className="size-4" />,
+                            onClick: () => moderate('muted', did, true, profile.displayName),
+                          },
+                      moderation.blocked.has(did)
+                        ? {
+                            label: 'Unblock',
+                            icon: <Ban className="size-4" />,
+                            onClick: () => moderate('blocked', did, false, profile.displayName),
+                          }
+                        : {
+                            label: 'Block',
+                            icon: <Ban className="size-4" />,
+                            danger: true,
+                            onClick: () => moderate('blocked', did, true, profile.displayName),
+                          },
+                    ]
+                  : []
+              }
+            />
             {me?.did === did ? (
               <Link to="/settings">
                 <Button variant="secondary">Edit profile</Button>
@@ -187,6 +231,12 @@ function ProfileView({ did }: { did: string }) {
           )}
         </p>
       </section>
+      {moderation.hidden(did) && (
+        <p className="border-y border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">
+          You {moderation.blocked.has(did) ? 'blocked' : 'muted'} this account. Their posts are hidden from your
+          timeline, Explore and notifications.
+        </p>
+      )}
       <Tabs
         value={tab}
         onChange={setTab}
@@ -229,7 +279,15 @@ function ProfileView({ did }: { did: string }) {
   )
 }
 
-function ShareMenu({ did, handle }: { did: string; handle?: string }) {
+function ShareMenu({
+  did,
+  handle,
+  extra = [],
+}: {
+  did: string
+  handle?: string
+  extra?: Parameters<typeof Menu>[0]['items']
+}) {
   const { toast } = useApp()
   const [qr, setQr] = useState(false)
   const link = profileLink(handle ?? did)
@@ -270,6 +328,7 @@ function ShareMenu({ did, handle }: { did: string; handle?: string }) {
             },
           },
           { label: 'Show QR code', icon: <QrIcon className="size-4" />, onClick: () => setQr(true) },
+          ...extra,
         ]}
       />
       {qr && (

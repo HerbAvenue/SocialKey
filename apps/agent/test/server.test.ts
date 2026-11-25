@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { Auth } from '../src/auth'
 import { loadConfig } from '../src/config'
+import { Moderation } from '../src/moderation'
 import { Publisher } from '../src/publisher'
 import { buildServer } from '../src/server'
 import { FakeKubo } from './fake-kubo'
@@ -28,7 +29,8 @@ describe('agent HTTP API', () => {
     const auth = await Auth.load(join(dir, 'tokens.json'), (c) => {
       code = c
     })
-    app = await buildServer({ config, publisher, auth })
+    const moderation = await Moderation.load(join(dir, 'moderation.json'))
+    app = await buildServer({ config, publisher, auth, moderation })
   })
 
   async function pair(): Promise<string> {
@@ -101,5 +103,26 @@ describe('agent HTTP API', () => {
     expect((await app.inject({ method: 'PUT', url: '/pinned', headers, payload: { cid } })).statusCode).toBe(200)
     expect((await app.inject({ method: 'DELETE', url: `/posts/${cid}`, headers })).statusCode).toBe(200)
     expect((await app.inject({ method: 'DELETE', url: `/posts/${cid}`, headers })).statusCode).toBe(404)
+  })
+
+  it('keeps private mute and block lists, and blocking unfollows', async () => {
+    const headers = { authorization: `Bearer ${await pair()}` }
+    const troll = identityFromSecretKey(generateSecretKey()).did
+    await app.inject({ method: 'POST', url: '/follows', headers, payload: { did: troll } })
+    await app.inject({ method: 'PUT', url: '/moderation/muted', headers, payload: { did: troll, on: true } })
+    const blocked = await app.inject({
+      method: 'PUT',
+      url: '/moderation/blocked',
+      headers,
+      payload: { did: troll, on: true },
+    })
+    expect(blocked.json()).toEqual({ muted: [troll], blocked: [troll] })
+    const me = await app.inject({ method: 'GET', url: '/moderation', headers })
+    expect(me.json().blocked).toEqual([troll])
+    expect(
+      (await app.inject({ method: 'PUT', url: '/moderation/nope', headers, payload: { did: troll, on: true } }))
+        .statusCode,
+    ).toBe(404)
+    expect((await app.inject({ method: 'GET', url: '/moderation' })).statusCode).toBe(401)
   })
 })

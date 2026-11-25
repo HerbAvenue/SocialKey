@@ -1,7 +1,7 @@
 import type { CID } from '@socialkey/core'
 import { CircleAlert, CircleCheck } from 'lucide-react'
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react'
-import { useKnownNetwork } from '../lib/queries'
+import { useKnownNetwork, useModeration } from '../lib/queries'
 import type { Network } from '../lib/social'
 import { ComposeModal } from './ComposeModal'
 import { Onboarding } from './Onboarding'
@@ -26,7 +26,13 @@ export function useApp(): AppContextValue {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const network = useKnownNetwork()
+  const known = useKnownNetwork()
+  const { hidden } = useModeration()
+  // Muted and blocked people's posts disappear everywhere that reads the shared network.
+  const network = useMemo(
+    () => known && { ...known, posts: known.posts.filter((e) => !hidden(e.post.author)) },
+    [known, hidden],
+  )
   const [toasts, setToasts] = useState<{ id: number; message: string; kind: 'ok' | 'error' }[]>([])
   const [composing, setComposing] = useState<ComposeTarget | null>(null)
 

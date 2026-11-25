@@ -37,6 +37,7 @@ SocialKey has no database and no server. Each person runs a small app that hosts
 - End-to-end encrypted direct messages with unread badges
 - Posts with up to 4 images, replies and threads, reposts and quotes, likes, @mentions with autocomplete, #hashtags
 - Pin a post to your profile, delete posts (including old ones)
+- Mute and block, with private lists that never leave your computer
 - Search people and posts across your network; paste an ID or `@handle` to open any profile
 - Share your profile with a link or QR code
 - Light and dark mode, and a mobile layout with a tab bar

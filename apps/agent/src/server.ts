@@ -6,6 +6,7 @@ import { z } from 'zod'
 import type { Auth } from './auth'
 import type { Config } from './config'
 import type { Hoster } from './hoster'
+import type { Moderation } from './moderation'
 import { NotFoundError, type Publisher } from './publisher'
 
 const MAX_MEDIA_BYTES = 20 * 1024 * 1024
@@ -45,16 +46,25 @@ const ProfileBody = z.object({
 const FollowBody = z.object({ did: didKey })
 const MessageBody = z.object({ to: didKey, text: z.string() })
 const KeysBody = z.object({ dids: z.array(didKey).max(500) })
+const ModerationBody = z.object({ did: didKey, on: z.boolean() })
 
 interface Deps {
   config: Config
   publisher: Publisher
   auth: Auth
   hoster?: Hoster
+  moderation?: Moderation
   logger?: boolean
 }
 
-export async function buildServer({ config, publisher, auth, hoster, logger = false }: Deps): Promise<FastifyInstance> {
+export async function buildServer({
+  config,
+  publisher,
+  auth,
+  hoster,
+  moderation,
+  logger = false,
+}: Deps): Promise<FastifyInstance> {
   const app = Fastify({ logger })
 
   await app.register(cors, {
@@ -159,6 +169,17 @@ export async function buildServer({ config, publisher, auth, hoster, logger = fa
   })
 
   app.post('/messages/keys', async (req) => ({ keys: publisher.conversationKeys(KeysBody.parse(req.body).dids) }))
+
+  app.get('/moderation', async () => moderation?.current ?? { muted: [], blocked: [] })
+
+  app.put<{ Params: { list: string } }>('/moderation/:list', async (req, reply) => {
+    const list = req.params.list === 'muted' ? 'muted' : req.params.list === 'blocked' ? 'blocked' : null
+    if (!list || !moderation) return reply.code(404).send({ error: 'Unknown list' })
+    const { did, on } = ModerationBody.parse(req.body)
+    // Blocking someone also stops following them.
+    if (list === 'blocked' && on && publisher.current.manifest.follows.includes(did)) await publisher.unfollow(did)
+    return moderation.set(list, did, on)
+  })
 
   app.post('/media', async (req, reply) => {
     if (!(req.body instanceof Buffer) || req.body.length === 0) {

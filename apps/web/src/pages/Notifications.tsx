@@ -5,7 +5,7 @@ import { useApp } from '../components/AppContext'
 import { Avatar } from '../components/Avatar'
 import { PostCard, usePerson } from '../components/PostCard'
 import { EmptyState, PageHeader, Spinner } from '../components/ui'
-import { useExtendedNetwork, useMe, useOwnManifest, usePost } from '../lib/queries'
+import { useExtendedNetwork, useMe, useModeration, useOwnManifest, usePost } from '../lib/queries'
 import { type Notification, notificationsFor } from '../lib/social'
 import { timeAgo } from '../lib/time'
 
@@ -22,7 +22,11 @@ function readSeen(): string {
 function useNotifications(): Notification[] {
   const { network } = useApp()
   const own = useOwnManifest()
-  return useMemo(() => (network && own ? notificationsFor(network, own, own.posts) : []), [network, own])
+  const { hidden } = useModeration()
+  return useMemo(
+    () => (network && own ? notificationsFor(network, own, own.posts).filter((n) => !hidden(n.from)) : []),
+    [network, own, hidden],
+  )
 }
 
 export function useUnreadCount(): number {
