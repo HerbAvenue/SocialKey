@@ -61,6 +61,8 @@ pnpm --filter @socialkey/desktop dist      # package for this OS into apps/deskt
 pnpm --filter @socialkey/desktop dist:win  # Windows NSIS installer; on Linux/macOS this needs Wine
 ```
 
+Screenshots in `docs/screenshots/` were captured from the seeded demo network; regenerate them after visible UI changes.
+
 Dependencies with install scripts must be allowed in `allowBuilds` in `pnpm-workspace.yaml` (`pnpm approve-builds <pkg>`), or installs fail.
 
 Agent config is via env: `SOCIALKEY_PORT` (4040), `KUBO_API` (http://127.0.0.1:5001), `KUBO_GATEWAY` (http://127.0.0.1:8080), `SOCIALKEY_DATA_DIR` (`~/.socialkey`), `SOCIALKEY_KEY_NAME` (`socialkey`), `SOCIALKEY_ORIGINS` (allowed CORS origins). Set `SOCIALKEY_WEB_ROOT` to a built `apps/web/dist` to serve the web app at `/app/`. Web config: `VITE_AGENT_URL`, `VITE_GATEWAYS`, `VITE_ROUTERS` (see `apps/web/.env.example`).
@@ -74,9 +76,13 @@ Agent config is via env: `SOCIALKEY_PORT` (4040), `KUBO_API` (http://127.0.0.1:5
 
 ### Data model (`core/src/schemas.ts`)
 Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) carry `author` (did:key) and `sig`.
-- **Manifest** (what the IPNS name points to): `profile`, `follows` (did:keys), `posts` (up to 50 recent post CIDs, newest first), optional `olderPosts`.
-- **Post**: `createdAt`, `text` (≤1000 chars), `media` (≤4 UnixFS CIDs), optional `replyTo` / `quoteOf`.
+- **Manifest** (what the IPNS name points to): `profile` (incl. optional domain `handle`), `follows` (did:keys), `posts` (up to 50 recent post CIDs, newest first), optional `olderPosts`, `likes` (≤500 post CIDs, newest first), `pinned`.
+- **Post**: `createdAt`, `text` (≤1000 chars), `media` (≤4 UnixFS CIDs), optional `replyTo` / `quoteOf` / `repostOf` / `mentions` (did:keys). A repost is a post with `repostOf`, empty text and no media.
+- New fields must be optional: old clients ignore them, and signatures cover the raw object, so they stay verifiable.
 - **Post page** (unsigned; trusted through the signed manifest's CID link): `posts`, optional `prev`. When a 51st recent post arrives, the oldest 25 move into a new page whose `prev` is the old `olderPosts` (`prependPost` in `core/src/manifest.ts`).
+
+### Domain handles (`core/src/handle.ts`)
+`alice.com` is a valid handle for a did when the TXT record `_socialkey.alice.com` holds `did=<did>` (exactly one distinct did). `core` takes the TXT lookup as a function; the web app uses DNS-over-HTTPS (`apps/web/src/lib/dns.ts`). Clients show a handle only after verifying it; the profile field alone proves nothing.
 
 ### Signing rules (`core/src/sign.ts`, `core/src/read.ts`)
 - Signature = Ed25519 over the DAG-JSON encoding of the object **without** `sig`. The CID covers the full encoding **with** `sig`.
@@ -87,20 +93,28 @@ Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) 
 - `Publisher` owns the manifest. All changes go through a serial queue: build unsigned → sign → `block/put` (bytes stored as-is; the CID Kubo returns is checked against the local one) → `name/publish` → atomically write `<dataDir>/manifest.dagjson`. If any step fails, the in-memory and on-disk manifest stay at the previous version.
 - On startup it re-stores and republishes the saved manifest, in case Kubo's repo was reset.
 - `Kubo` is an interface; tests use `test/fake-kubo.ts`, and the HTTP API is tested with `app.inject`.
-- API: `GET /health`, `POST /pair`, `GET /me`, `PUT /profile`, `POST /posts`, `POST /media` (raw body), `POST /follows`, `DELETE /follows/:did`. Everything except `/health` and `/pair` requires `Authorization: Bearer <token>`.
+- API: `GET /health`, `POST /pair`, `GET /me`, `PUT /profile`, `POST /posts`, `DELETE /posts/:cid`, `POST /media` (raw body), `POST /follows`, `DELETE /follows/:did`, `POST /likes`, `DELETE /likes/:cid`, `PUT /pinned`.
+- Deleting a post in an older page rebuilds that page and every newer page (`removeFromPages`), then unpins the post block.
+- `Hoster` (`src/hoster.ts`): every 30 minutes it pins each followed profile's manifest, 20 newest posts and their images, and re-announces their signed IPNS record (`routing/put`), so profiles stay online while any follower is. It records only pins it created (`pin()` returns false for blocks already pinned recursively) and only ever removes those. State lives in `<dataDir>/hosted.json`; `SOCIALKEY_HOST_FOLLOWS=false` disables it. IPNS records are read from the gateway's `/routing/v1/ipns/` endpoint because RPC `routing/get` needs Kubo online.
+- `scripts/seed.ts` publishes a nine-person demo network (see README). With `ipfs daemon --offline` it runs in seconds and the local gateway resolves every demo name. Everything except `/health` and `/pair` requires `Authorization: Bearer <token>`.
 - Pairing: the agent prints a one-time code (rotated after each use); `POST /pair` exchanges it for a token. Only SHA-256 token hashes are stored (`tokens.json`). The agent always binds to `127.0.0.1`; CORS allows only `SOCIALKEY_ORIGINS`.
 
 ### Web (`apps/web`)
 - `src/lib/ipfs.ts` fetches raw blocks (`Accept: application/vnd.ipld.raw`) and passes them to `core`'s readers. When paired, everything comes straight from the agent's Kubo gateway, and `/ipfs/` blocks are checked by re-hashing them. Don't route this through verified-fetch: in a browser it asks routers for providers, gets home-node TCP/QUIC addresses it can't dial, and hangs. verified-fetch (public gateways + delegated routing) is used only when no agent is paired.
 - `setLocalGateway` is called inside the `['me']` query function, before `me` reaches any component, so no fetch starts without it. Every fetch has a timeout (30s, or 60s for IPNS), so pages show an error instead of loading forever.
 - Your own manifest is fetched by the CID from `GET /me`, not via IPNS, so your changes show up immediately.
-- `src/lib/queries.ts`: posts are cached forever by CID, manifests for 60s. The timeline loads all followed manifests in parallel, takes up to 20 posts each, and merges with `mergeTimeline`. A profile or post that fails to resolve or verify is skipped, never fatal.
-- After an agent write, invalidate `['me']`: the new manifest CID changes the query keys that depend on it.
+- `src/lib/queries.ts`: posts are cached forever by CID, manifests for 60s. `useCircle` loads everyone you follow (20 posts each); `useExtendedNetwork` adds up to 120 friends of friends (5 posts each). Both are keyed by your follow list, not your manifest CID, so likes and posts don't reload the network. A profile or post that fails to resolve or verify is skipped, never fatal.
+- `src/lib/social.ts` holds the pure graph logic: suggestions, notifications, trending tags, reply/like/repost counts and search, all computed from the loaded `Network`. There is no server, so these only cover people within two follows; UI copy says so.
+- `AppContext` provides the merged network, toasts and the compose dialog to every page.
+- After an agent write, invalidate `['me']`: the new manifest CID refreshes your own manifest and posts.
+- Helia (`@helia/verified-fetch`) is imported dynamically and only loads for visitors without a paired agent.
+- Share links use `VITE_PUBLIC_URL` when set; `VITE_DOWNLOAD_URL` makes the landing page's download button link out.
 
 ### Desktop (`apps/desktop`)
 - `src/main.ts` starts a private Kubo (`src/kubo-daemon.ts`: own repo at `<dataDir>/kubo`, API port 45001, gateway 48080, so it never clashes with a user's own IPFS daemon), then calls the agent's `startAgent()` in-process on port 4040, serving the bundled web app at `http://127.0.0.1:4040/app/`.
 - It shares `~/.socialkey` (override with `SOCIALKEY_DATA_DIR`) with the command-line agent, so both use the same identity. Don't run both at once: they share port 4040.
 - "Open SocialKey" opens `/app/#/connect?code=<pairing code>`; the web Connect page pairs automatically, or skips pairing if the browser already has a working token.
+- "Friends keep each other online" toggles the agent's `Hoster`; desktop preferences live in `<dataDir>/desktop.json`.
 - Closing the window hides it; the app lives in the tray until "Quit". On quit it stops the agent, then Kubo. A Kubo left behind by a crash is shut down on the next start.
 - `--hidden` starts without the window (used by start-at-login). Linux start-at-login writes `~/.config/autostart/socialkey.desktop`, because Electron's login-item API doesn't cover Linux.
 - The window (`src/renderer/`) is plain HTML + TS with no framework. It gets everything from `AppState` (`src/state.ts`) through the sandboxed preload bridge.
@@ -108,4 +122,4 @@ Every object has a `type` and `version: 1`. Signed objects (`post`, `manifest`) 
 - Windows: every Kubo child process needs `windowsHide: true` (or a console window pops up), and `stop()` asks Kubo to shut down over the API because `kill()` on Windows terminates immediately. The tray uses the full-colour `tray-win.png`, since taskbars can be light or dark.
 
 ## Not built yet
-PubSub for real-time updates, replies/quotes in the UI, delegated routing / IPNI, an in-browser Helia node for posting without an agent, code signing / auto-update for the desktop app. The web bundle is ~1.5 MB (mostly Helia) and isn't code-split yet.
+Direct messages, real-time updates (PubSub), a mobile app, an in-browser Helia node for posting without an agent, code signing / auto-update for the desktop app. There is no LICENSE yet, so don't describe the project as open source in UI copy.
